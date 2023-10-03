@@ -3,6 +3,7 @@ import pandas as pd
 from urllib.parse import urlparse
 
 
+
 class DataFetcher:
     def __init__(self, url):
         """
