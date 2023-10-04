@@ -1,7 +1,6 @@
 from tkinter import messagebox
 from pathlib import Path
 import pandas as pd
-from fetcher.data_fetcher import get_coordinates_from_city_names
 
 
 class DataFrameHolder:
@@ -34,63 +33,17 @@ class DataFrameHolder:
             return None
 
     def process_data(self):
-        """
-        Processes the loaded DataFrame.
+        useful_columns = ['Région', 'Département', 'Code postal', 'Ville', 'Gazole_prix', 'SP95_prix',
+                          'E85_prix', 'GPLc_prix', 'E10_prix', 'SP98_prix', 'geom']
+        price_columns = ['Gazole_prix', 'SP95_prix', 'E85_prix', 'GPLc_prix', 'E10_prix', 'SP98_prix']
 
-        This method performs several data processing tasks, including removing unused columns,
-        converting price columns to numeric values, counting city occurrences, adding coordinates,
-        and calculating average prices.
-        """
-        self._remove_unused_columns()
-        self._convert_price_columns()
-        self._count_city_occurrences()
-        self._add_coordinates()
-        self._calculate_average_prices()
-
-    def _remove_unused_columns(self):
-        """
-        Removes unused columns from the DataFrame.
-
-        This method removes columns that are not needed for further processing.
-        """
-        useful_columns = ['Code postal', 'Ville', 'Gazole_prix', 'SP95_prix', 'E85_prix',
-                          'GPLc_prix', 'E10_prix', 'SP98_prix', 'Département', 'Région']
         self.df = self.df[useful_columns]
-
-    def _convert_price_columns(self):
-        """
-        Converts price columns to numeric values.
-
-        This method converts columns representing prices to numeric values and NaN if not a numeric for further analysis
-        """
-        price_columns = ['Gazole_prix', 'SP95_prix', 'E85_prix', 'GPLc_prix', 'E10_prix', 'SP98_prix']
         self.df[price_columns] = self.df[price_columns].apply(pd.to_numeric, errors='coerce')
-
-    def _count_city_occurrences(self):
-        """
-        Counts the occurrences of each city.
-
-        This method counts the number of occurrences of each city and adds it as a new column.
-        """
-        self.df['Nombre d\'occurrences'] = self.df['Ville'].value_counts().loc[self.df['Ville']].values
-
-    def _add_coordinates(self):
-        """
-        Adds coordinates to the DataFrame.
-
-        This method adds a 'Coordinates' column to the DataFrame with coordinates for each city.
-        """
-        self.df['Coordinates'] = get_coordinates_from_city_names(self.df['Ville'])
-
-    def _calculate_average_prices(self):
-        """
-        Calculates average prices.
-
-        This method calculates average prices per type of fuel, department, region, and city.
-        It also prints the total sum of occurrences.
-        """
-        price_columns = ['Gazole_prix', 'SP95_prix', 'E85_prix', 'GPLc_prix', 'E10_prix', 'SP98_prix']
-        self.df = self.df.groupby(['Région', 'Département', 'Ville'])[price_columns].mean().reset_index()
+        self.df['Code postal'] = self.df['Code postal'].astype(str)
+        self.df['Ville'] = self.df['Ville'].astype(str)
+        self.df.insert(2, 'cp_ville', self.df[['Code postal', 'Ville']].apply(' '.join, axis=1))
+        self.df.drop(columns=['Ville', 'Code postal'], inplace=True)
+        # supprimer region nan
 
     def save_processed_dataframe(self):
         """

@@ -1,68 +1,100 @@
 import requests
 import pandas as pd
-from urllib.parse import urlparse
-
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.firefox.options import Options
 
 
 class DataFetcher:
-    def __init__(self, url):
-        """
-        Initialize a DataFetcher object with a given URL.
+    """
+    This class allows fetching data from a specified URL, saving it to a CSV file,
+    importing it into a Pandas DataFrame, and obtaining the current date from a web page.
+    """
 
-        :param url: The URL to fetch data from.
+    def __init__(self, target_url):
         """
-        self.url = url
+        Initialize a DataFetcher object with a specified URL.
+
+        Args:
+            target_url (str): The URL from which data will be fetched.
+        """
+        self.target_url = target_url
 
     def fetch_data(self):
         """
         Fetch data from the specified URL.
 
-        :return: Content from self.url
+        Returns:
+            tuple: A tuple containing the raw data and the 'content-disposition' header value.
         """
         try:
-            # Use HTTP requests to download data from the URL while handling HTTP errors
-            response = requests.get(self.url)
+            response = requests.get(self.target_url)
             response.raise_for_status()
-            return response.content
+            content = response.content
+            content_disposition = response.headers.get("content-disposition")
+            return content, content_disposition
         except requests.exceptions.RequestException as e:
             raise Exception(f"Failed to fetch data: {e}")
 
-    def convert_csv(self, fetched_data):
+    def import_data(self):
         """
-        Convert a CSV into a DataFrame using pandas.
+        Import data into a Pandas DataFrame from the specified URL.
 
-        :param fetched_data: Content from self.url
-        :return: DataFrame with content from the CSV file
+        Returns:
+            tuple: A tuple containing the Pandas DataFrame of data and the current date.
         """
         try:
-            # Define file_name as the ID of the DataSet
-            file_name = "Fuel_price_FR.csv"
-
-            # Write the file_name.csv by opening the fetched_data content, then close it
-            with open(file_name, 'wb') as file:
-                file.write(fetched_data)
-
-            # Create the DataFrame by separating with ';'
-            df = pd.read_csv(file_name, delimiter=';')
-
-            return df
+            data, content_disposition = self.fetch_data()
+            file_name = content_disposition.split("filename=")[-1].strip('"')
+            self._save_data_to_file(data, file_name)
+            df = pd.read_csv(file_name, delimiter=";")
+            date_text = self._get_current_date()
+            return df, date_text
         except Exception as e:
-            raise Exception(f"Failed to convert CSV: {e}")
+            print(f"An error occurred: {e}")
+
+    def _save_data_to_file(self, data, file_name):
+        """
+        Save raw data to a file.
+
+        Args:
+            data (bytes): The raw data to be saved.
+            file_name (str): The name of the file where the data will be saved.
+        """
+        try:
+            with open(file_name, 'wb') as file:
+                file.write(data)
+        except Exception as e:
+            raise Exception(f"Failed to save data to file: {e}")
+
+    def _get_current_date(self):
+        """
+        Get the current date from a web page.
+
+        Returns:
+            str: The current date as text.
+        """
+        try:
+            options = Options()
+            options.headless = True
+            browser = webdriver.Firefox()
+            browser.get("https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2/information/")
+            date_element = browser.find_element(by=By.XPATH, value="/html/body/div[1]/main/div/div[4]/div[2]/div[2]/div[1]/div/div[2]/div/div[3]/div[6]/div[2]")
+            date_text = date_element.text
+            browser.quit()
+            return date_text
+        except Exception as e:
+            raise Exception(f"Failed to get current date: {e}")
 
 
-url = "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/exports/csv?lang=fr&timezone=Europe%2FParis&use_labels=true&delimiter=%3B"
-
-# Create an instance of the DataFetcher class, specifying the URL of the file
-fetcher = DataFetcher(url)
-
-try:
-    # Call the fetch_data method to download the data
-    data = fetcher.fetch_data()
-
-    # Then call the convert_csv method to save the data in CSV format and create a DataFrame
-    df = fetcher.convert_csv(data)
-
-    # Now you can work with the DataFrame 'df' as needed
-    print("File created correctly")
-except Exception as e:
-    print(f"An error occurred: {e}")
+if __name__ == "__main__":
+    browser = webdriver.Firefox()
+    browser.get('https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2/export/')
+    url_data_gouv = browser.find_element(by=By.XPATH,
+                                         value="/html/body/div[1]/main/div/div[4]/div[2]"
+                                               "/div[2]/div[7]/div/div/div/div[1]/ul[1]/li[1]/div/a").get_attribute('href')
+    browser.quit()
+    fetcher = DataFetcher(url_data_gouv)
+    result_tuple = fetcher.import_data()
+    print(result_tuple)
+    print()
