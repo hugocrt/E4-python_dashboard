@@ -1,8 +1,10 @@
 import requests
 import pandas as pd
+import tkinter as tk
+from tkinter import messagebox
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.options import Options
+
 
 def get_coordinates_from_city_names(list_cities):
     """
@@ -39,6 +41,14 @@ def get_coordinates_from_city_names(list_cities):
 
     return coordinates_list
 
+
+def show_error_message(message):
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    messagebox.showerror("Error", message)
+    root.destroy()
+
+
 class DataFetcher:
     """
     This class allows fetching data from a specified URL, saving it to a CSV file,
@@ -68,7 +78,7 @@ class DataFetcher:
             content_disposition = response.headers.get("content-disposition")
             return content, content_disposition
         except requests.exceptions.RequestException as e:
-            raise Exception(f"Failed to fetch data: {e}")
+            show_error_message(f"Failed to fetch data: {e}")
 
     def import_data(self):
         """
@@ -80,14 +90,14 @@ class DataFetcher:
         try:
             data, content_disposition = self.fetch_data()
             file_name = content_disposition.split("filename=")[-1].strip('"')
-            self._save_data_to_file(data, file_name)
+            self.save_data_to_file(data, file_name)
             df = pd.read_csv(file_name, delimiter=";")
-            date_text = self._get_current_date()
+            date_text = self.get_current_date()
             return df, date_text
         except Exception as e:
-            print(f"An error occurred: {e}")
+            show_error_message(f"An error occurred: {e}")
 
-    def _save_data_to_file(self, data, file_name):
+    def save_data_to_file(self, data, file_name):
         """
         Save raw data to a file.
 
@@ -99,9 +109,9 @@ class DataFetcher:
             with open(file_name, 'wb') as file:
                 file.write(data)
         except Exception as e:
-            raise Exception(f"Failed to save data to file: {e}")
+            show_error_message(f"Failed to save data to file: {e}")
 
-    def _get_current_date(self):
+    def get_current_date(self):
         """
         Get the current date from a web page.
 
@@ -111,25 +121,26 @@ class DataFetcher:
         options = webdriver.FirefoxOptions()
         options.headless = True
         try:
-            browser = webdriver.Firefox(options=options)
-            browser.get("https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2"
-                        "/information/")
+            driver = webdriver.Firefox(options=options)
+            driver.get("https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2"
+                       "/information/")
             # Need to wait to be sure that the web page is fully opened
-            browser.implicitly_wait(5)
+            driver.implicitly_wait(5)
             # Get through XPATH the "content" in the tag at the XPATH
-            date_element = browser.find_element(by=By.XPATH, value="/html/body/div[1]/main/div/div[4]/div[3]/div[2]/"
-                                                                   "div[1]/div/div[2]/div/div[3]/div[6]/div[2]")
+            date_element = driver.find_element(by=By.XPATH, value="/html/body/div[1]/main/div/div[4]/div[3]/div[2]/"
+                                                                  "div[1]/div/div[2]/div/div[3]/div[6]/div[2]/span")
             date_text = date_element.text
-            browser.quit()
+            driver.quit()
             return date_text
         except Exception as e:
-            raise Exception(f"Failed to get the current date: {e}")
+            show_error_message(f"Failed to get the current date: {e}")
+
 
 if __name__ == "__main__":
     browser = webdriver.Firefox()
     browser.get('https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2/'
                 'export/')
-    # Need to wait to be sure that the web page is fully opened
+    # Need to wait to be sure that the web page
     browser.implicitly_wait(5)
     # Get through XPATH the "href" from the tag at the XPATH
     url_data_gouv = browser.find_element(By.XPATH, '/html/body/div[1]/main/div/div[4]/div[3]/div[2]/div[7]/div/'
