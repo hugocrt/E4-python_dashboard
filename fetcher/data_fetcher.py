@@ -4,6 +4,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
 
+
 class DataFetcher:
     """
     This class allows fetching data from a specified URL, saving it to a CSV file,
