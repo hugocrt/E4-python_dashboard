@@ -106,29 +106,3 @@ class DataFetcher:
             show_error_message(f"Erreur lors de la demande HTTP : {e}")
         except IOError as e:
             show_error_message(f"Erreur lors de l'écriture du fichier local : {e}")
-
-
-def main():
-    # Créez une instance de la classe DataFetcher avec l'URL de base appropriée
-    data_fetcher = DataFetcher(base_url="https://data.economie.gouv.fr/explore/dataset/"
-                                        "prix-des-carburants-en-france-flux-instantane-v2/")
-
-    try:
-        # Obtenez l'URL du fichier CSV
-        csv_url = data_fetcher.get_csv_url()
-
-        # Téléchargez et sauvegardez le fichier CSV localement
-        data_fetcher.save_file_as_csv()
-
-        # Obtenez la date de la page web
-        data_fetcher.get_date()
-
-        # Affichez les données et la date obtenues
-        print("Données CSV téléchargées :", csv_url)
-        print("Date de dernière modification :", data_fetcher.date)
-    except Exception as e:
-        print(f"Une erreur s'est produite : {e}")
-
-
-if __name__ == "__main__":
-    main()
