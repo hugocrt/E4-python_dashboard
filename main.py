@@ -1,24 +1,29 @@
 from processor.data_processor import DataFrameHolder
+from fetcher.data_fetcher import DataFetcher
 
-# Donwload and put the .csv file in the folder "fetcher"
-browser = webdriver.Firefox()
-browser.get('https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2/'
-            'export/')
-browser.implicitly_wait(5)
-url_data_gouv = browser.find_element(By.XPATH, '/html/body/div[1]/main/div/div[4]/div[3]/div[2]/div[7]/div/'
-                                                'div/div/div[1]/ul[1]/li[1]/div/a').get_attribute('href')
-browser.quit()
+# Créez une instance de la classe DataFetcher avec l'URL de base appropriée
+data_fetcher = DataFetcher(base_url="https://data.economie.gouv.fr/explore/dataset/"
+                                    "prix-des-carburants-en-france-flux-instantane-v2/")
 
-fetcher = DataFetcher(url_data_gouv)
-result_tuple = fetcher.import_data()
-# Check the value (df, last modification date)
-print(result_tuple)
+try:
+    # Obtenez l'URL du fichier CSV
+    csv_url = data_fetcher.get_csv_url()
+
+    # Téléchargez et sauvegardez le fichier CSV localement
+    data_fetcher.save_file_as_csv()
+
+    # Obtenez la date de la page web
+    data_fetcher.get_date()
+
+    # Affichez les données et la date obtenues
+    print("Données CSV téléchargées :", csv_url)
+    print("Date de dernière modification :", data_fetcher.date)
+except Exception as e:
+    print(f"Une erreur s'est produite : {e}")
 
 # On traite nos données de prix des carburants des voitures en france
 df_holder = DataFrameHolder('prix-des-carburants-en-france-flux-instantane-v2.csv')
 df_holder.process_data()
 df_holder.save_processed_dataframe()
-
-# Import the required library
 
 

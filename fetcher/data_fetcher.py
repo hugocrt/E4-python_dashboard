@@ -96,7 +96,7 @@ class DataFetcher:
             response = requests.get(csv_url)
             response.raise_for_status()
 
-            local_path = os.path.join(os.getcwd(), file_name)
+            local_path = os.path.join(os.getcwd(), "fetcher", file_name)
 
             with open(local_path, 'wb') as file:
                 file.write(response.content)
