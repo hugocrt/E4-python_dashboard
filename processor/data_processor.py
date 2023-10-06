@@ -98,6 +98,7 @@ class DataFrameHolder:
         city_prices_means = (self.data_frame.groupby('cp_ville')[self.price_columns]
                              .mean().reset_index())
 
+        # Performing the average coordinates for each city
         city_coords_means = (self.data_frame.groupby('cp_ville')['geom']
                              .apply(self._mean_coords)
                              .reset_index(level=1, drop=True)
