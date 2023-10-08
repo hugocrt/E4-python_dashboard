@@ -6,20 +6,21 @@ import pandas as pd
 
 class DataFrameHolder:
     """
-    A class to hold and process a DataFrame for E4 python projet at ESIEE PARIS.
+    A class to hold and process a DataFrame for E4 python projet at ESIEE
+    PARIS
 
     :param:
         current_dir (Path): The current directory path.
         data_frame (pd.DataFrame): The DataFrame to be processed.
-        price_columns (list): List of column names containing price information.
+        price_columns (list): List of column names containing price information
     """
 
     def __init__(self, file_name):
         """
-        Initializes a DataFrameHolder object.
+        Initializes a DataFrameHolder object
 
         :param:
-            file_name (str): The name of the CSV file to be opened.
+            file_name (str): The name of the CSV file to be opened
         """
         # Set the current file directory for opening and saving file
         self.current_dir = Path(__file__).resolve().parent
@@ -31,25 +32,29 @@ class DataFrameHolder:
 
     def load_csv_file(self, file_name):
         """
-        Loads a CSV file from the 'fetcher' directory.
+        Loads a CSV file from the 'fetcher' directory
 
         :param:
-            file_name (str): The name of the CSV file to be loaded.
+            file_name (str): The name of the CSV file to be loaded
 
-        :return:
-            pd.DataFrame or None: If successful, returns a DataFrame with the CSV data.
-                                 If an error occurs, returns None and displays an error message.
+        :return: pd.DataFrame or None: If successful, returns a DataFrame
+        with the CSV data. If an error occurs, returns None and displays an
+        error message.
         """
         # Retrieve the upper directory and go in the fetcher directory
         csv_path = self.current_dir.parent / 'fetcher' / file_name
-        # Errors handling, we try to open the file, if we got an error print it in a box (with tk)
+        # Errors handling, we try to open the file, if we got an error print
+        # it in a box (with tk)
         try:
-            return pd.read_csv(csv_path, dtype={'Code postal': 'object'}, delimiter=';')
+            return pd.read_csv(csv_path, dtype={'Code postal': 'str'},
+                               delimiter=';')
         except FileNotFoundError as exception:
-            messagebox.showerror("Error", f"The file '{csv_path}' was not found: {exception}")
+            messagebox.showerror("Error", f"The file '{csv_path}' was not "
+                                          f"found: {exception}")
             return None
         except pd.errors.EmptyDataError as exception:
-            messagebox.showerror("Error", f"The file '{csv_path}' is empty: {exception}")
+            messagebox.showerror("Error", f"The file '{csv_path}' is empty: "
+                                          f"{exception}")
             return None
         except Exception as exception:  # pylint: disable=broad-except
             messagebox.showerror("Error", f"An error occurred: {exception}")
@@ -57,7 +62,8 @@ class DataFrameHolder:
 
     def process_data(self):
         """
-        Processes the data by performing data cleaning and computing a new DataFrame.
+        Processes the data by performing data cleaning and computing a new
+        DataFrame
         """
         # First we need to clean csv data
         self._data_cleaning()
@@ -68,35 +74,41 @@ class DataFrameHolder:
         """
         Performs data cleaning operations on the DataFrame.
         """
-        useful_columns = (['Région', 'Département', 'Code postal', 'Ville', 'geom']
-                          + self.price_columns)
+        useful_columns = (['Région', 'Département', 'Code postal', 'Ville',
+                           'geom'] + self.price_columns)
 
         # We do not need the others columns for our application
         self.data_frame = self.data_frame[useful_columns]
-        # We need unique key to perform grouping (ville is not sufficient, can have same names in
-        # different area)
+        # We need unique key to perform grouping (ville is not sufficient, can
+        # have same names in different area)
         self.data_frame['cp_ville'] = (self.data_frame['Code postal'] + ' '
                                        + self.data_frame['Ville'])
         # Then we do not have use of these
-        self.data_frame = self.data_frame.drop(columns=['Ville', 'Code postal'])
-        # There are data without specify (Région, département, Ville) so we delete these
+        self.data_frame = (
+            self.data_frame.drop(columns=['Ville', 'Code postal']))
+        # There are data without specify (Région, département, Ville) so we
+        # delete these
         self.data_frame = self.data_frame.dropna(subset=['Région'])
-        # Split geom and floating them to have latitude and longitude for further application
-        self.data_frame['geom'] = (self.data_frame['geom']
-                                   .apply(lambda x:
-                                   [float(coord) for coord in x.split(', ') if coord]))
+        # Split geom and floating them to have latitude and longitude for
+        # further application
+        self.data_frame['geom'] = (
+            self.data_frame['geom'].
+            apply(
+                lambda x: [float(coord) for coord in x.split(', ') if coord]))
 
     def _compute_new_dataframe(self):
         """
         Computes a new DataFrame by performing various operations.
         """
         # Mapping to have region and department linked to each city
-        city_geo_mapping = (self.data_frame.groupby('cp_ville')[['Région', 'Département']]
-                            .first().reset_index())
+        city_geo_mapping = (
+            self.data_frame.groupby('cp_ville')[['Région', 'Département']]
+            .first().reset_index())
 
         # Performing the average prices for each city
-        city_prices_means = (self.data_frame.groupby('cp_ville')[self.price_columns]
-                             .mean().reset_index())
+        city_prices_means = (
+            self.data_frame.groupby('cp_ville')[self.price_columns].mean()
+            .reset_index())
 
         # Performing the average coordinates for each city
         city_coords_means = (self.data_frame.groupby('cp_ville')['geom']
@@ -105,12 +117,14 @@ class DataFrameHolder:
                              .reset_index())
 
         # Count how many times a city appears
-        city_app_count = self.data_frame.groupby('cp_ville').size().reset_index(name='Apparition')
+        city_app_count = (self.data_frame.groupby('cp_ville').size()
+                          .reset_index(name='Apparition'))
 
         # merge all results to have one dataframe
-        self.data_frame = (city_geo_mapping.merge(city_prices_means, on='cp_ville')
-                                           .merge(city_coords_means, on='cp_ville')
-                                           .merge(city_app_count, on='cp_ville'))
+        self.data_frame = (city_geo_mapping
+                           .merge(city_prices_means, on='cp_ville')
+                           .merge(city_coords_means, on='cp_ville')
+                           .merge(city_app_count, on='cp_ville'))
 
     @staticmethod
     def _mean_coords(coords_list):
@@ -140,7 +154,8 @@ class DataFrameHolder:
         if not target_dir.is_dir():
             target_dir.mkdir()
 
-        # Errors handling, we try to save the file, if we got an error print it in a box (with tk)
+        # Errors handling, we try to save the file, if we got an error print it
+        # in a box (with tk)
         try:
             file_path = target_dir / 'processed_data.csv'
             self.data_frame.to_csv(file_path, index=False)
