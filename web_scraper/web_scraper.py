@@ -26,11 +26,10 @@ class FirefoxScraperHolder:
         self.current_working_folder = Path(__file__).resolve().parent
         self.driver = webdriver.Firefox(options=self.set_preferences())
         self.target_url = target_url
-        # Heritage ?
         self.csv_aria_label = csv_aria_label
         self.updated_data_date_ngif = updated_data_date_ngif
         self._updated_data_date = None
-        self.downloaded_csv_filename = None
+        self._downloaded_csv_filename = None
 
     def remove_existing_csvs(self):
         """
@@ -45,7 +44,7 @@ class FirefoxScraperHolder:
         """
         csv_files = list(self.current_working_folder.glob("*.csv"))
         if csv_files:
-            self.downloaded_csv_filename = csv_files[0].name
+            self._downloaded_csv_filename = csv_files[0].name
 
     def set_preferences(self):
         """
@@ -108,4 +107,4 @@ class FirefoxScraperHolder:
         """
         :return: The filename of the downloaded CSV.
         """
-        return self.downloaded_csv_filename
+        return self._downloaded_csv_filename
