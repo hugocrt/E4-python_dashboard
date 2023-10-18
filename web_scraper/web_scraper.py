@@ -1,4 +1,5 @@
-""" Module which provides methods for scraping data using Firefox webdriver.
+"""
+    Module which provides methods for scraping data using Firefox webdriver.
 """
 import time
 from pathlib import Path
@@ -85,7 +86,7 @@ class FirefoxScraperHolder:
                 # Download csv
                 self.click_on(By.LINK_TEXT, "Export")
                 self.click_on(By.CSS_SELECTOR, f"[aria-label='{aria_label}']")
-                self.wait_for_fully_downloaded()
+                self.wait_until_download_finishes()
 
         except WebDriverException as exception:
             print(f"An error occurred during the get operation: {exception}")
@@ -126,23 +127,12 @@ class FirefoxScraperHolder:
         info = wait.until(EC.visibility_of_element_located((find_by, value)))
         return info.text
 
-    def wait_for_fully_downloaded(self, timeout=60, check_interval=1):
-        """
-            Wait for a file to be fully downloaded.
-
-            :param timeout: Maximum time to wait in seconds.
-            Default is 60 seconds.
-            :param check_interval: Interval for checking file size
-             in seconds. Default is 1 second.
-        """
-        file_path = self.cwf / self._csv_id
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
-            if file_path.is_file():
-                initial_size = file_path.stat().st_size
-                time.sleep(check_interval)
-                # Checks if the file size changes during check_interval
-                if file_path.stat().st_size == initial_size:
-                    return
-        return
+    def wait_until_download_finishes(self):
+        dl_wait = True
+        while dl_wait:
+            time.sleep(5)
+            dl_wait = False
+            for file_name in self.cwf.iterdir():
+                print(file_name, file_name.suffix)
+                if file_name.suffix == '.part':
+                    dl_wait = True
