@@ -12,7 +12,7 @@ class DataFrameHolder:
     :param:
         current_dir (Path): The current directory path.
         _data_frame (pd.DataFrame): The DataFrame to be processed.
-        _price_columns (list): List of column names containing price
+        _fuel_columns (list): List of column names containing price
         information
     """
 
@@ -28,8 +28,8 @@ class DataFrameHolder:
         # Set a dataframe for further processes
         self._data_frame = self.load_csv_file(file_name)
         # Set the fuels
-        self._price_columns = ['Gazole_prix', 'SP98_prix', 'SP95_prix',
-                               'E85_prix', 'E10_prix', 'GPLc_prix']
+        self._fuel_columns = ['Gazole_prix', 'SP98_prix', 'SP95_prix',
+                              'E85_prix', 'E10_prix', 'GPLc_prix']
 
     @property
     def price_columns(self):
@@ -39,7 +39,7 @@ class DataFrameHolder:
         :return: The list of fuels.
         :rtype: list of str
         """
-        return self._price_columns
+        return self._fuel_columns
 
     @property
     def data_frame(self):
@@ -107,9 +107,14 @@ class DataFrameHolder:
         # Then we do not have use of these
         self._data_frame = (
             self._data_frame.drop(columns=['Ville', 'Code postal']))
+
+        self._data_frame = self._data_frame.rename(
+            columns={fuel: fuel.split('_')[0] for fuel in self._fuel_columns})
         # There are data without specify (Région, département, Ville) so we
         # delete these
         self._data_frame = self._data_frame.dropna(subset=['Région'])
+        self._fuel_columns = [col.split('_')[0] for col in self._fuel_columns]
+
         # Split geom and floating them to have latitude and longitude for
         # further application
         self._data_frame['geom'] = (
@@ -128,7 +133,7 @@ class DataFrameHolder:
 
         # Performing the average prices for each city
         city_prices_means = (
-            self._data_frame.groupby('cp_ville')[self.price_columns].mean()
+            self._data_frame.groupby('cp_ville')[self._fuel_columns].mean()
             .reset_index())
 
         # Performing the average coordinates for each city
@@ -139,7 +144,7 @@ class DataFrameHolder:
 
         # Count how many times a city appears
         city_app_count = (self._data_frame.groupby('cp_ville').size()
-                          .reset_index(name='Apparition'))
+                          .reset_index(name='Nombre de stations'))
 
         # merge all results to have one dataframe
         self._data_frame = (city_geo_mapping

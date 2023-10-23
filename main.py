@@ -19,9 +19,9 @@ df_holder.process_data()
 df_holder.save_dataframe()
 
 # Dashboard
-dashboard = DashboardHolder(df_holder.data_frame, df_holder.price_columns,
-                            firefox_scraper.updated_data_date)
-dashboard.app.run_server()
+# dashboard = DashboardHolder(df_holder.data_frame, df_holder.price_columns,
+#                             firefox_scraper.updated_data_date)
+# dashboard.app.run_server()
 
 
 
