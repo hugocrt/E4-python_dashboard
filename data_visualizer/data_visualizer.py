@@ -38,11 +38,6 @@ class DashboardHolder:
                 if pd.notna(fuel_value):
                     popup_fuel += f"<b>{col}:</b> {fuel_value:.3f}€/L<br>"
                 else:
-                    # popup_fuel += (html.Strong(col),
-                    #               html.Span('Non disponible',
-                    #                         style={'color': 'red'}),
-                    #               html.Br())
-
                     popup_fuel += (f"<b>{col}:</b> <span "
                                    f"style='color:red;'>Non disponible</span><br>")
 
@@ -60,8 +55,11 @@ class DashboardHolder:
                 ).add_to(mc)
 
         france_center = [46.232193, 2.209667]
-        map1 = folium.Map(location=france_center, zoom_start=6,
-                          tiles='cartodb positron')
+        map1 = folium.Map(
+            location=france_center,
+            zoom_start=6,
+            tiles='cartodb positron'
+        )
         mc1 = MarkerCluster()
         add_markers(self.data_frame, mc1)
         map1.add_child(mc1)
@@ -84,8 +82,11 @@ class DashboardHolder:
 
         return histogram_fig
 
-    def generate_department_average_barchart(self, department):
-        data = self.data_frame.query(f'Département == "{department}"')
+    def generate_average_barchart(self, area):
+        # if area[0].isDigit():
+        #     data = self.data_frame.query(f'cp_ville == "{area}"')
+        # else
+        data = self.data_frame.query(f'Département == "{area}"')
         percentage = [(fuel, data[fuel].count() / data.shape[0] * 100)
                       for fuel in self.fuel_columns]
 
@@ -100,8 +101,8 @@ class DashboardHolder:
         # Create the bar chart
         fig = px.bar(df_percentage, x='Fuel_Type', y='Percentage',
                      title=f'Présence du carburant en pourcentage dans les '
-                           f'stations : '
-                           f' {department}',
+                           f'stations :<br>'
+                           f' {area}',
                      text='Percentage',
                      # Add this line to display the percentage on the bars
                      labels={
@@ -149,133 +150,107 @@ class DashboardHolder:
                  style={'text-align': 'right', 'font-size': '20px',
                         'color': 'orange'})
 
+    @staticmethod
+    def create_dropdown(ptext, plist, pid):
+        if not type(plist) == pd.Series:
+            plist = pd.Series(plist)
+        return dbc.Col([
+            html.Label(ptext),
+            dcc.Dropdown(
+                id=f'{pid}-dropdown',
+                options=[{'label': element, 'value': element}
+                         for element in plist.unique()],
+                value=plist.unique()[0],
+                clearable=False
+            ),
+        ], md=4)
+
+    @staticmethod
+    def create_text_card(header_name, body_id):
+        class_name = 'card-title text-center'
+        first_word = header_name.split('-')[0]
+        if first_word == 'id':
+            h5_tag = html.H5(id=header_name, className=class_name)
+        else:
+            h5_tag = html.H5(header_name, className=class_name)
+
+        return dbc.Card(
+            [
+                dbc.CardHeader(h5_tag,
+                               style={'display': 'flex',
+                                      'align-items': 'center',
+                                      'justify-content': 'center'}),
+                dbc.CardBody(html.Div(id=body_id))
+            ],
+        )
+
+    @staticmethod
+    def create_graph_card(callback, graph_id=None,
+                          generate_static_graph=None):
+        if callback:
+            body_content = dcc.Graph(id=graph_id)
+        else:
+            body_content = dcc.Graph(figure=generate_static_graph)
+        return dbc.Col(
+            dbc.Card(
+                dbc.CardBody(
+                    body_content
+                ),
+                className="mt-4 shadow",
+            )
+        )
+
     def setup_layout(self):
         self.app.layout = html.Div([
-            self.set_title('Dashboard des Prix des Carburants'),
+            self.set_title('Prix et répartition des carburants par ville en '
+                           'France métropolitaine'),
             self.set_date(self.last_update_date),
+
             dbc.Row([
-                dbc.Col([
-                    html.Label("Sélectionnez le carburant :"),
-                    dcc.Dropdown(
-                        id='carburant-dropdown',
-                        options=[{'label': fuel, 'value': fuel}
-                                 for fuel in self.fuel_columns],
-                        value=self.fuel_columns[0],
-                        clearable=False
-                    ),
-                ], md=4),
-                dbc.Col([
-                    html.Label("Sélectionnez le département :"),
-                    dcc.Dropdown(
-                        id='departement-dropdown',
-                        options=[{'label': departement, 'value': departement}
-                                for departement in
-                                self.data_frame['Département'].unique()],
-                        value=self.data_frame['Département'].unique()[0],
-                        clearable=False
-                    ),
-                ], md=4),
-                dbc.Col([
-                    html.Label("Sélectionnez la Ville :"),
-                    dcc.Dropdown(
-                        id='city-dropdown',
-                        options=[{'label': city, 'value': city}
-                                 for city in
-                                 self.data_frame['cp_ville'].unique()],
-                        value=self.data_frame['cp_ville'].unique()[0],
-                        clearable=False
-                    ),
-                ], md=4),
+                self.create_dropdown('Sélectionnez la région :',
+                                     self.data_frame['Région'],
+                                     'région'),
+                self.create_dropdown('Sélectionnez le département :',
+                                     self.data_frame['Département'],
+                                     'département'),
+                self.create_dropdown('Sélectionnez la ville :',
+                                     self.data_frame['cp_ville'],
+                                     'ville')
             ]),
 
             dbc.Row([
-                dbc.Col([
-                    dbc.CardGroup(
-                        [
-                            dbc.Card(
-                                [
-                                    dbc.CardHeader(html.H5("Prix moyens en "
-                                                       "France",
-                                                           className="card-title text-center"),
-                                                   style={'height': '150px', 'display': 'flex', 'align-items': 'center', 'justify-content': 'center'}),
-                                    dbc.CardBody(html.Div(id='average-prices'))
-                                ],
-                            ),
-                            dbc.Card(
-                                [
-                                    dbc.CardHeader(html.Div(id='card2-title',
-                                                            className="card-title "
-                                                                      "text-center"),
-                                                   style={'height': '150px', 'display': 'flex', 'align-items': 'center', 'justify-content': 'center'}),
-                                    dbc.CardBody(html.Div(
-                                        id='department-price-difference',
-                                                          className="custom-card-text"))
-                                ]
-                            ),
-                            dbc.Card(
-                                [
-                                    dbc.CardHeader(html.Div(id='card3-title',
-                                                            className="card-title "
-                                                                      "text-center"),
-                                                   style={'height': '150px', 'display': 'flex', 'align-items': 'center', 'justify-content': 'center'}),
-                                    dbc.CardBody(html.Div(
-                                        id='city-price-difference',
-                                        className="custom-card-text"))
-                                ]
-                            ),
-                        ],
-                        className="mt-4 shadow",
-                    ),
-                ], md=6),
-
-                dbc.Col([
-                    dbc.Card(
-                        dbc.CardBody(
-                            dcc.Graph(id='histogram-plot', figure=self.generate_histogram())
-                        ),
-                        className="mt-4 shadow",
-                    ),
-                ], md=6),
-            ]),
-
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card(
-                        dbc.CardBody(
-                            dcc.Graph(id='department-average-barchart',
-                                      figure=self.generate_department_average_barchart(self.data_frame['Département'].unique()[0]))
-                        ),
-                        className="mt-4 shadow",
-                    ),
-                ], md=6),
-
-                dbc.Col([
-                    dbc.Card(
-                        dbc.CardBody(
-                            dcc.Graph(id='percentage-barchart',
-                                      figure=self.generate_percentage_barchart())
-                        ),
-                        className="mt-4 shadow",
-                    ),
-                ], md=6),
-            ]),
-            dbc.Col([
-                dbc.Card(
+                dbc.CardGroup(
                     [
-                        dbc.CardHeader(html.H5("Répartition des stations en "
-                                               "France et Prix des carburants "
-                                               "des stations par ville",
-                                               className="card-title "
-                                                         "text-center"),
-                                       ),
-
-                        dbc.CardBody(html.Div(id='folium-map')),
+                        self.create_text_card(header_name='France',
+                                              body_id='average-prices'),
+                        self.create_text_card(header_name='id-card1-title',
+                                              body_id='reg-price'),
+                        self.create_text_card(header_name='id-card2-title',
+                                              body_id='dep-price'),
+                        self.create_text_card(header_name='id-card3-title',
+                                              body_id='city-price')
                     ],
                     className="mt-4 shadow",
-                    id='folium-card'
                 ),
-            ], md=6),
+            ]),
 
+            dbc.CardGroup([
+                self.create_graph_card(False,
+                                       generate_static_graph=
+                                       self.generate_percentage_barchart()),
+                self.create_graph_card(True,
+                                       'department-average-barchart'),
+            ]),
+
+            dbc.Col([
+                self.create_dropdown('Sélectionnez le carburant :',
+                                     self.fuel_columns,
+                                     'carburant'),
+                self.create_graph_card(True, 'histogram-plot')
+            ], md=6),
+            self.create_text_card(
+                'Répartition des stations en France par ville'
+                ' et prix des carburants', 'id-folium-map'),
         ], className="container")
 
     def register_callbacks(self):
@@ -299,30 +274,34 @@ class DashboardHolder:
             return html.Ul(avg_prices_list)
 
         @self.app.callback(
-            Output('card2-title', 'children'),
-            [Input('departement-dropdown', 'value')]
+            Output('id-card1-title', 'children'),
+            [Input('région-dropdown', 'value')]
         )
-        def update_card2_title(departement_selected):
+        def update_blue_text(region_selected):
             return html.Div([
-                "Prix moyen ",
-                html.Span(departement_selected, style={'color': 'blue'}),
-                " et différence par rapport au territoire métropolitain"
+                html.Span(region_selected, style={'color': 'blue'})
+            ])
+        @self.app.callback(
+            Output('id-card2-title', 'children'),
+            [Input('département-dropdown', 'value')]
+        )
+        def update_blue_text(departement_selected):
+            return html.Div([
+                html.Span(departement_selected, style={'color': 'blue'})
             ])
 
         @self.app.callback(
-            Output('card3-title', 'children'),
-            [Input('city-dropdown', 'value')]
+            Output('id-card3-title', 'children'),
+            [Input('ville-dropdown', 'value')]
         )
-        def update_card2_title(city_selected):
+        def update_blue_text(city_selected):
             return html.Div([
-                "Prix moyen ",
-                html.Span(city_selected, style={'color': 'blue'}),
-                " et différence par rapport au territoire métropolitain"
+                html.Span(city_selected, style={'color': 'blue'})
             ])
 
         @self.app.callback(
-            Output('department-price-difference', 'children'),
-            [Input('departement-dropdown', 'value')]
+            Output('dep-price', 'children'),
+            [Input('département-dropdown', 'value')]
         )
         def display_price_difference(departement_selected):
             df_filtered = self.data_frame[
@@ -349,8 +328,8 @@ class DashboardHolder:
             return html.Ul(price_difference_list)
 
         @self.app.callback(
-            Output('city-price-difference', 'children'),
-            [Input('city-dropdown', 'value')]
+            Output('city-price', 'children'),
+            [Input('ville-dropdown', 'value')]
         )
         def display_price_difference(city_selected):
             df_filtered = self.data_frame[
@@ -377,14 +356,42 @@ class DashboardHolder:
             return html.Ul(price_difference_list)
 
         @self.app.callback(
-            Output('department-average-barchart', 'figure'),
-            [Input('departement-dropdown', 'value')]
+            Output('reg-price', 'children'),
+            [Input('région-dropdown', 'value')]
         )
-        def update_department(departement_selected):
-            return self.generate_department_average_barchart(departement_selected)
+        def display_price_difference(city_selected):
+            df_filtered = self.data_frame[
+                self.data_frame['Région'] == city_selected]
+            avg_prices_reg = df_filtered[self.fuel_columns].mean()
+            avg_prices_national = self.data_frame[self.fuel_columns].mean()
+
+            price_difference_list = [
+                html.Li(
+                    [
+                        f"{fuel} : {avg_prices_reg[fuel]:.3f} € ",
+                        html.Span(
+                            f"("
+                            f"{avg_prices_reg[fuel] - avg_prices_national[fuel]:+.3f} €)",
+                            style={'color': 'red' if avg_prices_reg[
+                                                         fuel] >
+                                                     avg_prices_national[
+                                                         fuel] else 'green'}
+                        )
+                    ]
+                )
+                for fuel in avg_prices_reg.keys()
+            ]
+            return html.Ul(price_difference_list)
 
         @self.app.callback(
-            Output('folium-map', 'children'),  # Update the 'folium-map' Div
+            Output('department-average-barchart', 'figure'),
+            [Input('département-dropdown', 'value')]
+        )
+        def update_department(departement_selected):
+            return self.generate_average_barchart(departement_selected)
+
+        @self.app.callback(
+            Output('id-folium-map', 'children'),  # Update the 'folium-map' Div
             [Input('carburant-dropdown', 'value')]
         )
         def update_folium_map(fuel_selected):
