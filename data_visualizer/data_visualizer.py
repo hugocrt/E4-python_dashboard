@@ -14,8 +14,7 @@ class DashboardHolder:
         self.fuel_columns = price_columns
         self.last_update_date = lud
         self.app = dash.Dash(__name__,
-                             external_stylesheets=[dbc.themes.LUX],
-
+                             external_stylesheets=[dbc.themes.LUX]
                              )
         self.dep = dataframe['Département'].unique()
         self.reg = dataframe['Région'].unique()
@@ -24,198 +23,87 @@ class DashboardHolder:
 
     def setup_layout(self):
         self.app.layout = html.Div([
+            dbc.Card([
+                dbc.CardBody([
+                    self.set_title(
+                        'Prix et répartition des carburants par ville en '
+                        'France métropolitaine'),
 
-            self.set_title('Prix et répartition des carburants par ville en '
-                           'France métropolitaine'),
-            self.set_date(self.last_update_date),
+                    html.Div(self.set_date(self.last_update_date)),
+                ])
+            ], style={'background-color': '#f0f0f0', 'border-radius': '10px'},
+                className='header-box'),
 
-            dbc.Row([
-                self.create_dropdown('Sélectionnez la région :',
-                                     self.data_frame['Région'],
-                                     'reg'),
-                self.create_dropdown('Sélectionnez le département :',
-                                     self.data_frame['Département'],
-                                     'dep'),
-                self.create_dropdown('Sélectionnez la ville :',
-                                     self.data_frame['cp_ville'],
-                                     'city')
-            ]),
+            self.create_whitespace(5),
 
-            html.Div(style={'margin-bottom': '20px'}),
+            html.Div([
+                dbc.Row([
+                    dbc.Col(),
+                    self.create_dropdown('Sélectionnez la région :',
+                                         self.data_frame['Région'],
+                                         'reg'),
+                    self.create_dropdown('Sélectionnez le département :',
+                                         self.data_frame['Département'],
+                                         'dep'),
+                    self.create_dropdown('Sélectionnez la ville :',
+                                         self.data_frame['cp_ville'],
+                                         'cit')
+                ]),
 
-            dbc.Row([
-                dbc.CardGroup(
-                    [
-                        self.create_area_card(False,
-                                              header_name='France',
-                                              body_id='fr-prices',
-                                              generate_static_graph=
-                                              self.generate_average_barchart()
-                                              ),
-                        self.create_area_card(True,
-                                              header_name='reg-price-title',
-                                              body_id='reg-price',
-                                              graph_id='reg-barchart'
-                                              ),
-                        self.create_area_card(True,
-                                              header_name='dep-price-title',
-                                              body_id='dep-price',
-                                              graph_id='dep-barchart'
-                                              ),
-                        self.create_area_card(True,
-                                              header_name='city-price-title',
-                                              body_id='city-price',
-                                              graph_id='city-barchart'
-                                              )
-                    ],
-                )
-            ]),
+                self.create_whitespace(10),
 
-            dbc.Col([
-                self.create_dropdown('Sélectionnez le carburant :',
-                                     self.fuel_columns, 'fuel'),
-                self.create_graph_card(True, 'histogram-plot')
-            ]),
+                dbc.Row([
+                    dbc.Col(self.generate_area_card('France'), md=3,
+                            style={'padding': '0'}),
+                    dbc.Col(id='reg-card', md=3, style={'padding': '0'}),
+                    dbc.Col(id='dep-card', md=3, style={'padding': '0'}),
+                    dbc.Col(id='cit-card', md=3, style={'padding': '0'})
+                ]),
 
-            self.create_text_card(
-                'Répartition des stations en France par ville'
-                ' et prix des carburants', 'id-folium-map')
 
-        ], className="container")
+                self.create_whitespace(10),
+
+                dbc.Col([
+                    self.create_dropdown('Sélectionnez le carburant :',
+                                         self.fuel_columns, 'fuel'),
+                    self.create_graph_card(True, 'histogram-plot')
+                ]),
+
+                self.create_whitespace(10),
+
+                self.create_text_card(
+                    'Répartition des stations en France par ville'
+                    ' et prix des carburants', 'id-folium-map')
+
+            ], className='content')
+        ], className='container')
 
     def register_callbacks(self):
         @self.app.callback(
-            Output('reg-price-title', 'children'),
-            [Input('reg-dropdown', 'value')]
-        )
-        def update_blue_text(region_selected):
-            return html.Div([
-                html.Span(region_selected, style={'color': 'blue'})
-            ])
+            [Output(f'{area}-card', 'children')
+             for area in ['reg', 'dep', 'cit']],
 
-        @self.app.callback(
-            Output('dep-price-title', 'children'),
-            [Input('dep-dropdown', 'value')]
+            [Input(f'{area}-dropdown', 'value')
+             for area in ['reg', 'dep', 'cit']]
         )
-        def update_blue_text(departement_selected):
-            return html.Div([
-                html.Span(departement_selected, style={'color': 'blue'})
-            ])
-
-        @self.app.callback(
-            Output('city-price-title', 'children'),
-            [Input('city-dropdown', 'value')]
-        )
-        def update_blue_text(city_selected):
-            return html.Div([
-                html.Span(city_selected, style={'color': 'blue'})
-            ])
-
-        @self.app.callback(
-            Output('fr-prices', 'children'),
-            [Input('fuel-dropdown', 'value')]
-        )
-        def print_average_prices(fuel_selected):
-            avg_prices = self.data_frame[
-                self.fuel_columns].mean()
-            avg_prices_list = [
-                html.Li(f"{fuel} : {avg_price:.3f} €")
-                for fuel, avg_price in avg_prices.items()]
-            return html.Ul(avg_prices_list)
-
-        @self.app.callback(
-            Output('reg-price', 'children'),
-            [Input('reg-dropdown', 'value')]
-        )
-        def update_price_display(area_selected):
-            return self.display_price_difference(area_selected)
-
-        @self.app.callback(
-            Output('dep-price', 'children'),
-            [Input('dep-dropdown', 'value')]
-        )
-        def update_price_display(area_selected):
-            return self.display_price_difference(area_selected)
-
-        @self.app.callback(
-            Output('city-price', 'children'),
-            [Input('city-dropdown', 'value')]
-        )
-        def update_price_display(area_selected):
-            return self.display_price_difference(area_selected)
-
-        @self.app.callback(
-            Output('reg-barchart', 'figure'),
-            [Input('reg-dropdown', 'value')]
-        )
-        def update_department(area_selected):
-            return self.generate_average_barchart(area_selected)
-
-        @self.app.callback(
-            Output('dep-barchart', 'figure'),
-            [Input('dep-dropdown', 'value')]
-        )
-        def update_department(area_selected):
-            return self.generate_average_barchart(area_selected)
-
-        @self.app.callback(
-            Output('city-barchart', 'figure'),
-            [Input('city-dropdown', 'value')]
-        )
-        def update_department(area_selected):
-            return self.generate_average_barchart(area_selected)
+        def update_area_card(*selected_areas):
+            return [self.generate_area_card(area) for area in selected_areas]
 
         @self.app.callback(
             Output('histogram-plot', 'figure'),
             [Input('fuel-dropdown', 'value')]
         )
         def update_histogram(fuel_selected):
-            return self.generate_histogram(fuel_selected)
+            return self.generate_price_histogram(fuel_selected)
 
         @self.app.callback(
-            Output('id-folium-map', 'children'),  # Update the 'folium-map' Div
+            Output('id-folium-map', 'children'),
             [Input('fuel-dropdown', 'value')]
         )
         def update_folium_map(fuel_selected):
             return self.generate_folium_map()
 
     def generate_folium_map(self):
-
-        def get_city_popup(row):
-            """
-            Generate the popup content for a city marker.
-
-            Args:
-                row (pd.Series): A row from the DataFrame.
-
-            Returns:
-                folium.Popup: A Popup object.
-            """
-            popup_title = f"<h4>{row['cp_ville']}</h4>"
-
-            # Generate the fuel information for the popup
-            popup_fuel = ''
-            for col in price_columns_list:
-                fuel_value = row[col]
-                if pd.notna(fuel_value):
-                    popup_fuel += f"<b>{col}:</b> {fuel_value:.3f}€/L<br>"
-                else:
-                    popup_fuel += (f"<b>{col}:</b> <span "
-                                   f"style='color:red;'>Non disponible</span><br>")
-
-            popup_stations_count = (f"<br><b>Nombre de stations:</b>"
-                                    f" {row['Nombre de stations']}")
-
-            return folium.Popup(popup_title + popup_fuel + popup_stations_count,
-                                max_width=300)
-
-        def add_markers(df, mc):
-            for _, row in df.iterrows():
-                folium.Marker(
-                    location=[row['Latitude'], row['Longitude']],
-                    popup=get_city_popup(row)
-                ).add_to(mc)
-
         france_center = [46.232193, 2.209667]
         map1 = folium.Map(
             location=france_center,
@@ -223,13 +111,51 @@ class DashboardHolder:
             tiles='cartodb positron'
         )
         mc1 = MarkerCluster()
-        add_markers(self.data_frame, mc1)
+        DashboardHolder._add_cities_markers(self.data_frame, mc1)
         map1.add_child(mc1)
         folium_map_html = map1.get_root().render()
         return html.Iframe(srcDoc=folium_map_html,
                            style={'width': '100%', 'height': '600px'})
 
-    def generate_histogram(self, selected_fuel='Gazole'):
+    @staticmethod
+    def _get_city_popup(row):
+        """
+        Generate the popup content for a city marker.
+
+        Args:
+            row (pd.Series): A row from the DataFrame.
+
+        Returns:
+            folium.Popup: A Popup object.
+        """
+        popup_title = f"<h4>{row['cp_ville']}</h4>"
+
+        # Generate the fuel information for the popup
+        popup_fuel = ''
+        for col in price_columns_list:
+            fuel_value = row[col]
+            if pd.notna(fuel_value):
+                popup_fuel += f"<b>{col}:</b> {fuel_value:.3f}€/L<br>"
+            else:
+                popup_fuel += (f"<b>{col}:</b> <span "
+                               f"style='color:red;'>Non disponible</span>"
+                               f"<br>")
+
+        popup_stations_count = (f"<br><b>Nombre de stations:</b>"
+                                f" {row['Nombre de stations']}")
+
+        return folium.Popup(popup_title + popup_fuel + popup_stations_count,
+                            max_width=300)
+
+    @staticmethod
+    def _add_cities_markers(dataf, mc):
+        for _, row in dataf.iterrows():
+            folium.Marker(
+                location=[row['Latitude'], row['Longitude']],
+                popup=DashboardHolder._get_city_popup(row)
+            ).add_to(mc)
+
+    def generate_price_histogram(self, selected_fuel='Gazole'):
         histogram_fig = px.histogram(
             self.data_frame,
             x=selected_fuel,
@@ -245,8 +171,7 @@ class DashboardHolder:
         return histogram_fig
 
     def get_data_from_area(self, area):
-        if area is not None:
-            area_query = None
+        if area != 'France':
             if area[0].isdigit():
                 area_query = 'cp_ville'
             elif area in self.reg:
@@ -257,9 +182,9 @@ class DashboardHolder:
         else:
             return self.data_frame
 
-    def generate_average_barchart(self, area=None):
+    def generate_average_barchart(self, area):
         data = self.get_data_from_area(area)
-        national_data = self.get_data_from_area(None)
+        national_data = self.get_data_from_area('France')
 
         national_percentage = [
             (fuel,
@@ -287,10 +212,12 @@ class DashboardHolder:
             columns=['Fuel_Type', 'area_per']
         )
 
-        area_percentage = area_percentage.sort_values(
-            by='area_per',
-            ascending=False
-        )
+        # Sort area_percentage DataFrame based on national_percentage order
+        area_percentage['Fuel_Type'] = pd.Categorical(
+            area_percentage['Fuel_Type'],
+            categories=national_percentage['Fuel_Type'],
+            ordered=True)
+        area_percentage = area_percentage.sort_values(by='Fuel_Type')
 
         merged_percentage = pd.merge(
             area_percentage, national_percentage, on='Fuel_Type'
@@ -303,8 +230,8 @@ class DashboardHolder:
             y=merged_percentage['area_per'],
             name='Area Data',
             text=merged_percentage['area_per'],
-            textposition='outside',
-            marker=dict(color='blue')
+            textposition='auto',
+            marker=dict(color='lightblue')
         ))
 
         # Add trace for difference data
@@ -315,23 +242,23 @@ class DashboardHolder:
                 continue
             elif diff > 0:
                 diff_text = f'+{diff}%'
-                color = 'green'
+                color = 'lightgreen'
             else:
                 diff_text = f'{diff}%'
-                color = 'red'
+                color = 'lightcoral'
 
             fig.add_trace(go.Bar(
                 x=[row['Fuel_Type']],
                 y=[diff],
                 text=diff_text,
-                textposition='outside',
+                textposition='auto',
                 marker=dict(color=color)
             ))
 
         fig.update_layout(
-            xaxis_title='Type de carburant',
+            xaxis_title=None,
             yaxis_title='Présent dans les villes à (%)',
-            barmode='relative',
+            barmode='overlay',
             margin=dict(
                 l=0,
                 r=0,
@@ -339,45 +266,74 @@ class DashboardHolder:
                 b=0,
             ),
             height=250,
-            showlegend=False
+            showlegend=False,
+            xaxis=dict(title_font=dict(size=11), tickangle=-45),
+            yaxis=dict(title_font=dict(size=11), range=[-100, 100])
         )
 
         return fig
 
-    def display_price_difference(self, area=None):
+    def display_price(self, area):
         data = self.get_data_from_area(area)
         avg_area_price = data[self.fuel_columns].mean()
-        avg_prices_national = self.get_data_from_area(None)[
-            self.fuel_columns].mean()
+        national_data = self.get_data_from_area('France')
+        avg_prices_national = national_data[self.fuel_columns].mean()
+        price_difference_list = []
 
-        price_difference_list = [
-            html.Li(
+        for fuel in self.fuel_columns:
+            price = avg_area_price[fuel]
+            if pd.notna(price):
+                price_text = (html.Span(
+                    fuel,
+                    style={'font-weight': 'bold', 'color': 'black'}),
+                              html.Span(
+                                  f' : {price:.3f} €')
+                )
+                price_diff_text = None
+                color = 'black'
+
+                if area != 'France':
+                    price_diff = price - avg_prices_national[fuel]
+
+                    if price_diff == 0:
+                        price_diff_text = f'({price_diff:+.3f} €)'
+                        color = 'grey'
+                    elif price_diff > 0:
+                        price_diff_text = f'({price_diff:+.3f} €)'
+                        color = 'red'
+                    else:
+                        price_diff_text = f'({price_diff:+.3f} €)'
+                        color = 'green'
+            else:
+                price_text = f'{fuel} : Non disponible'
+                price_diff_text = None
+                color = 'grey'
+
+            price_difference_list.append(html.Li(
                 [
-                    f"{fuel} : {avg_area_price[fuel]:.3f} € ",
+                    html.Span(price_text),
                     html.Span(
-                        f"("
-                        f"{avg_area_price[fuel] - avg_prices_national[fuel]:+.3f} €)",
-                        style={'color': 'red'
-                        if avg_area_price[fuel] > avg_prices_national[fuel]
-                        else 'green'}
-                    )
+                        price_diff_text,
+                        style={'color': color, 'font-weight': 'bold'}
+                    ) if price_diff_text else None
                 ]
-            )
-            for fuel in avg_area_price.keys()
-        ]
+            ))
+
         return html.Ul(price_difference_list)
 
     @staticmethod
     def set_title(title_text):
         return html.H1(title_text, style={
             'text-align': 'center', 'margin-bottom': '20px',
-            'font-weight': 'bold', 'text-decoration': 'underline'})
+            'font-weight': 'bold', 'text-decoration': 'underline',
+            'font-family': 'Roboto, sans-serif'})
 
     @staticmethod
     def set_date(update_date):
         return html.Div(f"Dernière mise à jour des données : {update_date}",
-                        style={'text-align': 'right', 'font-size': '20px',
-                               'color': 'orange'})
+                        style={'text-align': 'right', 'font-size': '17px',
+                               'color': 'orange',
+                               'font-weight': 'bold'})
 
     @staticmethod
     def create_dropdown(ptext, plist, id_dropdown):
@@ -392,7 +348,7 @@ class DashboardHolder:
                 value=plist.unique()[0],
                 clearable=False
             ),
-        ], md=4)
+        ], md=3)
 
     @staticmethod
     def create_text_card(header_name, body_id):
@@ -405,46 +361,34 @@ class DashboardHolder:
 
         return dbc.Card(
             [
-                dbc.CardHeader(h5_tag,
-                               style={'display': 'flex',
-                                      'align-items': 'center',
-                                      'justify-content': 'center'}),
+                dbc.CardHeader(h5_tag),
                 dbc.CardBody(html.Div(id=body_id))
             ],
         )
 
-    @staticmethod
-    def create_area_card(callback, header_name, body_id, graph_id=None,
-                         generate_static_graph=None):
-
-        class_name = 'card-title text-center'
-        first_word = header_name.split('-')[0]
-
-        if callback:
-            h5_tag = html.H5(id=header_name, className=class_name)
-            body_content = dcc.Graph(
-                id=graph_id,
-                config={'displayModeBar': False}
-            )
-        else:
-            h5_tag = html.H5(header_name, className=class_name)
-            body_content = dcc.Graph(
-                figure=generate_static_graph,
-                config={'displayModeBar': False}
-            )
-
+    def generate_area_card(self, area):
         return dbc.Card(
             [
-                dbc.CardHeader(h5_tag,
-                               style={'display': 'flex',
-                                      'align-items': 'center',
-                                      'justify-content': 'center'}),
+                dbc.CardHeader(
+                    html.H5(area,
+                            className='card-title text-center',
+                            style={'font-size': '12px'}
+                            ),
+                    style={'display': 'flex',
+                           'align-items': 'center',
+                           'justify-content': 'center'}
+                ),
+
                 dbc.CardBody([
-                    html.Div(id=body_id),
+                    html.Div(self.display_price(area)),
                     html.Hr(),
-                    body_content
+                    dcc.Graph(
+                        figure=self.generate_average_barchart(area),
+                        config={'displayModeBar': False}
+                    )
                 ])
-            ]
+            ],
+            style={'border-radius': '10px'}
         )
 
     @staticmethod
@@ -457,6 +401,10 @@ class DashboardHolder:
         return dbc.Card(
             dbc.CardBody(body_content)
         )
+
+    @staticmethod
+    def create_whitespace(space):
+        return html.Div(style={'margin-bottom': f'{space}px'})
 
 
 if __name__ == '__main__':
