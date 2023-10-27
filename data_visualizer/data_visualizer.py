@@ -371,7 +371,7 @@ class DashboardHolder:
                     fuel,
                     style={'font-weight': 'bold', 'color': 'black'}),
                               html.Span(
-                                  f' : {price:.3f} €')
+                                  f' : {price:.3f} €/L')
                 )
                 price_diff_text = None
                 color = 'black'
@@ -379,7 +379,7 @@ class DashboardHolder:
                 if area != 'France':
                     price_diff = (round(price, 3)
                                   - round(avg_prices_national[fuel], 3))
-                    price_diff_text = f'({price_diff:+.3f} €)'
+                    price_diff_text = f'({price_diff:+.3f})'
 
                     if price_diff == 0:
                         price_diff_text = '(-.---) ='
