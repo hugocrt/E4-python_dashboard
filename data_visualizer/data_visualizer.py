@@ -111,14 +111,13 @@ class DashboardHolder:
             tiles='cartodb positron'
         )
         mc1 = MarkerCluster()
-        DashboardHolder._add_cities_markers(self.data_frame, mc1)
+        self._add_cities_markers(self.data_frame, mc1)
         map1.add_child(mc1)
         folium_map_html = map1.get_root().render()
         return html.Iframe(srcDoc=folium_map_html,
                            style={'width': '100%', 'height': '600px'})
 
-    @staticmethod
-    def _get_city_popup(row):
+    def _get_city_popup(self, row):
         """
         Generate the popup content for a city marker.
 
@@ -132,7 +131,7 @@ class DashboardHolder:
 
         # Generate the fuel information for the popup
         popup_fuel = ''
-        for col in price_columns_list:
+        for col in self.fuel_columns:
             fuel_value = row[col]
             if pd.notna(fuel_value):
                 popup_fuel += f"<b>{col}:</b> {fuel_value:.3f}€/L<br>"
@@ -147,12 +146,11 @@ class DashboardHolder:
         return folium.Popup(popup_title + popup_fuel + popup_stations_count,
                             max_width=300)
 
-    @staticmethod
-    def _add_cities_markers(dataf, mc):
+    def _add_cities_markers(self, dataf, mc):
         for _, row in dataf.iterrows():
             folium.Marker(
                 location=[row['Latitude'], row['Longitude']],
-                popup=DashboardHolder._get_city_popup(row)
+                popup=self._get_city_popup(row)
             ).add_to(mc)
 
     def generate_price_histogram(self, selected_fuel='Gazole'):
@@ -165,7 +163,7 @@ class DashboardHolder:
         )
 
         histogram_fig.update_traces(
-            marker=dict(line=dict(width=1, color='Blue'))
+            marker={'line': {'width': 1, 'color': 'Blue'}}
         )
 
         return histogram_fig
@@ -231,7 +229,7 @@ class DashboardHolder:
             name='Area Data',
             text=merged_percentage['area_per'],
             textposition='auto',
-            marker=dict(color='lightblue')
+            marker={'color': 'lightblue'}
         ))
 
         # Add trace for difference data
@@ -252,23 +250,24 @@ class DashboardHolder:
                 y=[diff],
                 text=diff_text,
                 textposition='auto',
-                marker=dict(color=color)
+                marker={'color': color}
             ))
 
         fig.update_layout(
             xaxis_title=None,
-            yaxis_title='Présent dans les villes à (%)',
+            yaxis_title='Disponible dans (%) des villes',
             barmode='overlay',
-            margin=dict(
-                l=0,
-                r=0,
-                t=0,
-                b=0,
-            ),
+            margin={
+                'l': 0,
+                'r': 0,
+                't': 0,
+                'b': 0
+            },
             height=250,
             showlegend=False,
-            xaxis=dict(title_font=dict(size=11), tickangle=-45),
-            yaxis=dict(title_font=dict(size=11), range=[-100, 100])
+
+            xaxis={'title_font': {'size': 11}, 'tickangle': -45},
+            yaxis={'title_font': {'size': 11}, 'range': [-100, 100]}
         )
 
         return fig
@@ -287,25 +286,30 @@ class DashboardHolder:
                     fuel,
                     style={'font-weight': 'bold', 'color': 'black'}),
                               html.Span(
-                                  f' : {price:.3f} €')
+                                  f' : {price:+.3f} €')
                 )
                 price_diff_text = None
                 color = 'black'
 
                 if area != 'France':
-                    price_diff = price - avg_prices_national[fuel]
+                    price_diff = (round(price, 3)
+                                  - round(avg_prices_national[fuel], 3))
 
                     if price_diff == 0:
-                        price_diff_text = f'({price_diff:+.3f} €)'
+                        price_diff_text = f'({price_diff} €) (=)'
                         color = 'grey'
                     elif price_diff > 0:
-                        price_diff_text = f'({price_diff:+.3f} €)'
+                        price_diff_text = f'({price_diff:+.3f} €) ▲'
                         color = 'red'
                     else:
-                        price_diff_text = f'({price_diff:+.3f} €)'
+                        price_diff_text = f'({price_diff:+.3f} €) ▼'
                         color = 'green'
             else:
-                price_text = f'{fuel} : Non disponible'
+                price_text = (html.Span(
+                    fuel,
+                    style={'font-weight': 'bold', 'color': 'black'}),
+                              html.Span(f' : Non disponible')
+                )
                 price_diff_text = None
                 color = 'grey'
 
@@ -314,7 +318,7 @@ class DashboardHolder:
                     html.Span(price_text),
                     html.Span(
                         price_diff_text,
-                        style={'color': color, 'font-weight': 'bold'}
+                        style={'color': color}
                     ) if price_diff_text else None
                 ]
             ))
