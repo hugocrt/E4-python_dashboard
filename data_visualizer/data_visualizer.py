@@ -38,7 +38,7 @@ class DashboardHolder:
 
             html.Div([
                 dbc.Row([
-                    dbc.Col(),
+                    self.create_switch_button('switch-button'),
                     self.create_dropdown('Sélectionnez la région :',
                                          self.data_frame['Région'],
                                          'reg'),
@@ -71,6 +71,9 @@ class DashboardHolder:
 
                 self.create_whitespace(10),
 
+                # self.generate_reg_s_piechart(),
+                # self.generate_reg_sc_piechart(),
+
                 self.create_text_card(
                     'Répartition des stations en France par ville'
                     ' et prix des carburants', 'id-folium-map')
@@ -102,6 +105,52 @@ class DashboardHolder:
         )
         def update_folium_map(fuel_selected):
             return self.generate_folium_map()
+
+        @self.app.callback(
+            Output('dep-dropdown', 'options'),
+            [Input('reg-dropdown', 'value'),
+             Input('switch-button', 'value')]
+        )
+        def update_dep_dropdown(reg, switch):
+            if switch == 'Verrouiller':
+                return [{'label': dep, 'value': dep} for dep in
+                        self.from_reg_get_dep(reg)]
+            else:
+                return [{'label': dep, 'value': dep} for dep in
+                        self.data_frame['Département'].unique()]
+
+        @self.app.callback(
+            Output('cit-dropdown', 'options'),
+            [Input('dep-dropdown', 'value'),
+             Input('switch-button', 'value')]
+        )
+        def update_dep_dropdown(dep, switch):
+            if switch == 'Verrouiller':
+                return [{'label': dep, 'value': dep} for dep in
+                        self.from_dep_get_cities(dep)]
+            else:
+                return [{'label': dep, 'value': dep} for dep in
+                        self.data_frame['cp_ville'].unique()]
+
+        @self.app.callback(
+            Output('dep-dropdown', 'value'),
+            [Input('dep-dropdown', 'options')]
+        )
+        def set_default_dep_value(options):
+            if options:
+                return options[0]['value']
+            else:
+                return None
+
+        @self.app.callback(
+            Output('cit-dropdown', 'value'),
+            [Input('cit-dropdown', 'options')]
+        )
+        def set_default_cit_value(options):
+            if options:
+                return options[0]['value']
+            else:
+                return None
 
     def generate_folium_map(self):
         france_center = [46.232193, 2.209667]
@@ -168,6 +217,33 @@ class DashboardHolder:
 
         return histogram_fig
 
+    def generate_reg_s_piechart(self):
+        fig = px.pie(
+            self.data_frame,
+            names='Région',
+            values='Nombre de stations',
+            title='Distribution des Stations par Région')
+
+        fig.update_traces(textinfo='percent+label')
+        fig.update_layout(showlegend=False)
+        fig.show()
+
+    def generate_reg_sc_piechart(self):
+        region_city_counts = self.data_frame.groupby('Région')[
+            'cp_ville'].nunique().reset_index(name='Number_of_Cities')
+
+        # Assuming df is your DataFrame
+        fig = px.pie(region_city_counts, names='Région',
+                     values='Number_of_Cities',
+                     title='Number of Cities by Region')
+
+        # You can customize the layout if needed
+        fig.update_traces(textinfo='percent+label')
+        fig.update_layout(showlegend=False)
+
+        # Show the plot
+        fig.show()
+
     def get_data_from_area(self, area):
         if area != 'France':
             if area[0].isdigit():
@@ -210,7 +286,6 @@ class DashboardHolder:
             columns=['Fuel_Type', 'area_per']
         )
 
-        # Sort area_percentage DataFrame based on national_percentage order
         area_percentage['Fuel_Type'] = pd.Categorical(
             area_percentage['Fuel_Type'],
             categories=national_percentage['Fuel_Type'],
@@ -253,9 +328,14 @@ class DashboardHolder:
                 marker={'color': color}
             ))
 
+        if area[0].isdigit():
+            y_title = 'Disponible ou non dans la ville'
+        else:
+            y_title = 'Disponible dans (x%) des villes'
+
         fig.update_layout(
             xaxis_title=None,
-            yaxis_title='Disponible dans (%) des villes',
+            yaxis_title=y_title,
             barmode='overlay',
             margin={
                 'l': 0,
@@ -272,12 +352,17 @@ class DashboardHolder:
 
         return fig
 
-    def display_price(self, area):
-        data = self.get_data_from_area(area)
-        avg_area_price = data[self.fuel_columns].mean()
+    def display_text_info(self, area):
+        area_data = self.get_data_from_area(area)
+        avg_area_price = area_data[self.fuel_columns].mean()
+        area_stations_count = area_data['Nombre de stations'].sum()
+
         national_data = self.get_data_from_area('France')
         avg_prices_national = national_data[self.fuel_columns].mean()
-        price_difference_list = []
+        national_cs_count = self.data_frame['cp_ville'].nunique()
+        national_stations_count = national_data['Nombre de stations'].sum()
+
+        text_info_list = []
 
         for fuel in self.fuel_columns:
             price = avg_area_price[fuel]
@@ -286,7 +371,7 @@ class DashboardHolder:
                     fuel,
                     style={'font-weight': 'bold', 'color': 'black'}),
                               html.Span(
-                                  f' : {price:+.3f} €')
+                                  f' : {price:.3f} €')
                 )
                 price_diff_text = None
                 color = 'black'
@@ -294,16 +379,18 @@ class DashboardHolder:
                 if area != 'France':
                     price_diff = (round(price, 3)
                                   - round(avg_prices_national[fuel], 3))
+                    price_diff_text = f'({price_diff:+.3f} €)'
 
                     if price_diff == 0:
-                        price_diff_text = f'({price_diff} €) (=)'
+                        price_diff_text = '(-.---) ='
                         color = 'grey'
                     elif price_diff > 0:
-                        price_diff_text = f'({price_diff:+.3f} €) ▲'
+                        price_diff_text += ' ▲'
                         color = 'red'
                     else:
-                        price_diff_text = f'({price_diff:+.3f} €) ▼'
+                        price_diff_text += ' ▼'
                         color = 'green'
+
             else:
                 price_text = (html.Span(
                     fuel,
@@ -313,7 +400,7 @@ class DashboardHolder:
                 price_diff_text = None
                 color = 'grey'
 
-            price_difference_list.append(html.Li(
+            text_info_list.append(html.Li(
                 [
                     html.Span(price_text),
                     html.Span(
@@ -323,20 +410,64 @@ class DashboardHolder:
                 ]
             ))
 
-        return html.Ul(price_difference_list)
+        if area in self.reg:
+            area_cs_count = (self.data_frame.groupby('Région')['cp_ville']
+                             .nunique())[area]
+            color = 'grey'
+        elif area in self.dep:
+            area_cs_count = (self.data_frame.groupby('Département')['cp_ville']
+                             .nunique())[area]
+            color = 'grey'
+        elif area[0].isdigit():
+            area_cs_count = 1
+            color = 'white'
+        else:
+            area_cs_count = self.data_frame['cp_ville'].nunique()
+            color = 'grey'
+
+        area_stations_rate = (
+                    area_stations_count / national_stations_count * 100)
+        area_cs_rate = (area_cs_count / national_cs_count * 100)
+
+        text_info_list.append(
+                html.Div(
+                    [
+                        html.Br(),
+                        html.Span(f'Nombre de villes avec stations : ',
+                                  style={'color': color}),
+                        html.Br(),
+                        html.Span(f'{area_cs_count} ⇔ ({area_cs_rate:.2f}%)',
+                                  style={'color': color}),
+                        html.Br(),
+                        html.Span(f'Nombre de stations : ',
+                                  style={'color': 'grey'}),
+                        html.Br(),
+                        html.Span(f'{area_stations_count} ⇔ ('
+                                  f'{area_stations_rate:.2f}%)',
+                                  style={'color': 'grey'})
+                    ],
+                    style={'font-size': '12px'})
+        )
+
+        return html.Ul(text_info_list)
 
     @staticmethod
     def set_title(title_text):
-        return html.H1(title_text, style={
-            'text-align': 'center', 'margin-bottom': '20px',
-            'font-weight': 'bold', 'text-decoration': 'underline',
-            'font-family': 'Roboto, sans-serif'})
+        return html.H1(title_text,
+                       style={
+                           'text-align': 'center',
+                           'margin-bottom': '20px',
+                           'font-weight': 'bold',
+                           'text-decoration': 'underline',
+                           'font-family': 'Roboto, sans-serif'
+                       }
+                       )
 
     @staticmethod
     def set_date(update_date):
         return html.Div(f"Dernière mise à jour des données : {update_date}",
                         style={'text-align': 'right', 'font-size': '17px',
-                               'color': 'orange',
+                               'color': 'darkorange',
                                'font-weight': 'bold'})
 
     @staticmethod
@@ -371,6 +502,20 @@ class DashboardHolder:
         )
 
     def generate_area_card(self, area):
+        title_style = {
+            'text-align': 'center',
+            'text-decoration': 'underline',
+            'font-size': '10px'
+        }
+        if area == 'France':
+            text_title = 'Prix moyens sur le territoire français métropolitain'
+            text_graph = ('Distribution des carburants sur le territoire '
+                          'français métropolitain')
+        else:
+            text_title = 'Prix et différences moyennes avec la France'
+            text_graph = ('Distribution des carburants et différences moyennes '
+                          'avec la France')
+
         return dbc.Card(
             [
                 dbc.CardHeader(
@@ -384,8 +529,12 @@ class DashboardHolder:
                 ),
 
                 dbc.CardBody([
-                    html.Div(self.display_price(area)),
+                    html.Div(html.H5(text_title, style=title_style)),
+                    html.Div(self.display_text_info(area)),
+
                     html.Hr(),
+
+                    html.Div(html.H5(text_graph, style=title_style)),
                     dcc.Graph(
                         figure=self.generate_average_barchart(area),
                         config={'displayModeBar': False}
@@ -410,10 +559,45 @@ class DashboardHolder:
     def create_whitespace(space):
         return html.Div(style={'margin-bottom': f'{space}px'})
 
+    def from_reg_get_dep(self, reg):
+        filtered_data = self.data_frame.query(f'Région == "{reg}"')
+        departments = filtered_data['Département'].unique().tolist()
+        return departments
+
+    def from_dep_get_cities(self, dep):
+        filtered_data = self.data_frame.query(f'Département == "{dep}"')
+        cities = filtered_data['cp_ville'].unique().tolist()
+        return cities
+
+    @staticmethod
+    def create_switch_button(button_switch):
+        """
+        Creates a switch button inside a card using Dash Bootstrap Components.
+
+        Args:
+            button_switch (str): The ID of the switch button.
+
+        Returns:
+            dbc.Card: The card component containing the switch button.
+        """
+        options = [
+            {'label': 'Verrouiller', 'value': 'Verrouiller'},
+            {'label': 'Déverrouiller', 'value': 'Déverrouiller'}
+        ]
+
+        return dbc.Col(
+            dcc.RadioItems(
+                id=button_switch,
+                options=options,
+                value=options[0]['value'],
+                labelStyle={'display': 'flex'},
+                style={'margin-top': '10px', 'margin-bottom': '10px'}
+            ), md=3
+        )
+
 
 if __name__ == '__main__':
-    price_columns_list = ['Gazole', 'SP98', 'SP95',
-                          'E85', 'E10', 'GPLc']
+    price_columns_list = ['Gazole', 'SP98', 'SP95', 'E85', 'E10', 'GPLc']
     date = 'date test'
     df = pd.read_csv('processed_data.csv')
     dashboard = DashboardHolder(df, price_columns_list, date)
