@@ -1,10 +1,10 @@
 import dash
-from dash import dcc, html, Input, Output
+import folium
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import pandas as pd
 import dash_bootstrap_components as dbc
-import folium
+from dash import dcc, html, Input, Output
 from folium.plugins import MarkerCluster
 
 
@@ -14,72 +14,50 @@ class DashboardHolder:
         self.fuel_columns = price_columns
         self.last_update_date = lud
         self.app = dash.Dash(__name__,
-                             external_stylesheets=[dbc.themes.LUX]
+                             external_stylesheets=[dbc.themes.LUX],
                              )
         self.dep = dataframe['Département'].unique()
         self.reg = dataframe['Région'].unique()
+        self.reg_color_mapping = self.generate_color_mapping(self.reg)
         self.setup_layout()
+        self.setup_validation_layout()
         self.register_callbacks()
 
     def setup_layout(self):
         self.app.layout = html.Div([
-            dbc.Card([
-                dbc.CardBody([
-                    self.set_title(
-                        'Prix et répartition des carburants par ville en '
-                        'France métropolitaine'),
+            dcc.Location('url', refresh=False),
+            self.setup_navbar(),
 
-                    html.Div(self.set_date(self.last_update_date)),
-                ])
-            ], style={'background-color': '#f0f0f0', 'border-radius': '10px'},
-                className='header-box'),
+            html.Div(
+                id='page-content',
+                children=[],
+                style={
+                    'flex': '1',
+                }
+            ),
 
-            self.create_whitespace(5),
+            self.setup_footer(),
+        ], style={
+            'margin': '10px',
+            'display': 'flex',
+            'flex-direction': 'column',
+            'min-height': '100vh',
+        })
 
+    def setup_validation_layout(self):
+        self.app.validation_layout = html.Div([
             html.Div([
-                dbc.Row([
-                    self.create_switch_button('switch-button'),
-                    self.create_dropdown('Sélectionnez la région :',
-                                         self.data_frame['Région'],
-                                         'reg'),
-                    self.create_dropdown('Sélectionnez le département :',
-                                         self.data_frame['Département'],
-                                         'dep'),
-                    self.create_dropdown('Sélectionnez la ville :',
-                                         self.data_frame['cp_ville'],
-                                         'cit')
-                ]),
-
+                dcc.Location(id="url", refresh=False),
+                self.setup_navbar(),
                 self.create_whitespace(10),
-
-                dbc.Row([
-                    dbc.Col(self.generate_area_card('France'), md=3,
-                            style={'padding': '0'}),
-                    dbc.Col(id='reg-card', md=3, style={'padding': '0'}),
-                    dbc.Col(id='dep-card', md=3, style={'padding': '0'}),
-                    dbc.Col(id='cit-card', md=3, style={'padding': '0'})
-                ]),
-
-
-                self.create_whitespace(10),
-
-                dbc.Col([
-                    self.create_dropdown('Sélectionnez le carburant :',
-                                         self.fuel_columns, 'fuel'),
-                    self.create_graph_card(True, 'histogram-plot')
-                ]),
-
-                self.create_whitespace(10),
-
-                # self.generate_reg_s_piechart(),
-                # self.generate_reg_sc_piechart(),
-
-                self.create_text_card(
-                    'Répartition des stations en France par ville'
-                    ' et prix des carburants', 'id-folium-map')
-
-            ], className='content')
-        ], className='container')
+                html.Div(id="page-content", children=[], )
+            ],
+                style={'margin': '0px 100px 0px'},
+            ),
+            self.setup_layout_home(),
+            self.setup_layout_histogram(),
+            self.setup_layout_map()
+        ])
 
     def register_callbacks(self):
         @self.app.callback(
@@ -152,12 +130,31 @@ class DashboardHolder:
             else:
                 return None
 
+        @self.app.callback(
+            Output('page-content', 'children'),
+            [Input('url', 'pathname')]
+        )
+        def render_page_content(pathname):
+            if pathname == '/histogramme':
+                return self.setup_layout_histogram()
+            elif pathname == '/carte':
+                return self.setup_layout_map()
+            else:
+                return self.setup_layout_home()
+
     def generate_folium_map(self):
         france_center = [46.232193, 2.209667]
         map1 = folium.Map(
             location=france_center,
-            zoom_start=6,
-            tiles='cartodb positron'
+            zoom_start=5,
+            tiles='cartodb positron',
+            max_zoom=18,
+            min_zoom=5,
+            min_lat=33,
+            max_lat=55,
+            min_lon=-20,
+            max_lon=24,
+            max_bounds=True
         )
         mc1 = MarkerCluster()
         self._add_cities_markers(self.data_frame, mc1)
@@ -217,32 +214,239 @@ class DashboardHolder:
 
         return histogram_fig
 
-    def generate_reg_s_piechart(self):
+    @staticmethod
+    def generate_color_mapping(list_to_map):
+        color_mapping = {}
+        color_scale = px.colors.qualitative.Light24_r
+        for i in range(len(list_to_map)):
+            color_mapping[list_to_map[i]] = color_scale[i]
+
+        return color_mapping
+
+    @staticmethod
+    def generate_pie_chart(df, names_column, values_column, title,
+                           color_mapping):
         fig = px.pie(
-            self.data_frame,
-            names='Région',
-            values='Nombre de stations',
-            title='Distribution des Stations par Région')
+            df,
+            names=names_column,
+            values=values_column,
+            title=title,
+            color=names_column,
+            color_discrete_map=color_mapping,
+            hole=0.5
+        ).update_traces(textinfo='percent + label',
+                        textposition='outside').update_layout(showlegend=False)
 
-        fig.update_traces(textinfo='percent+label')
-        fig.update_layout(showlegend=False)
-        fig.show()
+        return fig
 
-    def generate_reg_sc_piechart(self):
-        region_city_counts = self.data_frame.groupby('Région')[
-            'cp_ville'].nunique().reset_index(name='Number_of_Cities')
+    @staticmethod
+    def setup_navbar():
+        return dbc.Nav([
+            dbc.NavLink("Accueil", href="/", active="exact"),
+            dbc.NavLink("Histogramme", href="/histogramme", active="exact"),
+            dbc.NavLink("Cartographie", href="/carte", active="exact"),
+        ],
+            horizontal=True,
+            pills=True,
+        )
 
-        # Assuming df is your DataFrame
-        fig = px.pie(region_city_counts, names='Région',
-                     values='Number_of_Cities',
-                     title='Number of Cities by Region')
+    def setup_layout_home(self):
+        return [
+            dbc.Card([
+                dbc.CardBody([
+                    self.set_title(
+                        'Prix et répartition des carburants par ville en '
+                        'France métropolitaine'),
 
-        # You can customize the layout if needed
-        fig.update_traces(textinfo='percent+label')
-        fig.update_layout(showlegend=False)
+                    html.Div(self.set_date(self.last_update_date)),
+                ])
+            ], style={'background-color': '#f0f0f0',
+                      'border-radius': '10px'},
+                className='header-box'),
 
-        # Show the plot
-        fig.show()
+            self.create_whitespace(5),
+
+            html.Div([
+                dbc.Row([
+                    self.create_switch_button('switch-button'),
+                    self.create_dropdown('Sélectionnez la région :',
+                                         self.data_frame['Région'],
+                                         'reg'),
+                    self.create_dropdown('Sélectionnez le département :',
+                                         self.data_frame['Département'],
+                                         'dep'),
+                    self.create_dropdown('Sélectionnez la ville :',
+                                         self.data_frame['cp_ville'],
+                                         'cit')
+                ]),
+
+                self.create_whitespace(10),
+
+                dbc.Row([
+                    dbc.Col(self.generate_area_card('France'), md=3,
+                            style={'padding': '0'}),
+                    dbc.Col(id='reg-card', md=3, style={'padding': '0'}),
+                    dbc.Col(id='dep-card', md=3, style={'padding': '0'}),
+                    dbc.Col(id='cit-card', md=3, style={'padding': '0'})
+                ]),
+            ]),
+        ]
+
+    def setup_layout_histogram(self):
+        return [
+            dbc.Card([
+                dbc.CardBody([
+                    self.set_title(
+                        'Distribution des stations essence en France'),
+
+                    html.Div(self.set_date(self.last_update_date)),
+                ])
+            ], style={'background-color': '#f0f0f0',
+                      'border-radius': '10px'},
+                className='header-box'),
+
+            self.create_whitespace(5),
+
+            dbc.Col([
+                self.create_dropdown('Sélectionnez le carburant :',
+                                     self.fuel_columns, 'fuel'),
+                self.create_graph_card(True, 'histogram-plot')
+            ]),
+
+            self.create_whitespace(10),
+
+            dbc.Col([
+                self.create_graph_card(
+                    False,
+                    generate_static_graph=self.generate_pie_chart(
+                        self.data_frame,
+                        'Région',
+                        'Nombre de stations',
+                        'Distribution des Stations par Région',
+                        self.reg_color_mapping
+                    ),
+                ),
+                self.create_graph_card(
+                    False,
+                    generate_static_graph=self.generate_pie_chart(
+                        self.data_frame.groupby('Région')['cp_ville']
+                        .nunique()
+                        .reset_index()
+                        .rename(
+                            columns={'cp_ville': 'Number_of_Cities'}
+                        ),
+                        'Région',
+                        'Number_of_Cities',
+                        'Distribution du nombre de Villes comportant au '
+                        'moins une Station par Région',
+                        self.reg_color_mapping
+                    )
+                )
+            ]),
+        ]
+
+    def setup_layout_map(self):
+        return [
+            dbc.Card([
+                dbc.CardBody([
+                    self.set_title(
+                        'Répartition des stations en France par ville'
+                        ' et prix des carburants'),
+
+                    html.Div(self.set_date(self.last_update_date)),
+                ])
+            ], style={'background-color': '#f0f0f0',
+                      'border-radius': '10px'},
+                className='header-box'),
+
+            self.create_whitespace(5),
+
+            dbc.Col([
+                self.create_dropdown('Sélectionnez le carburant :',
+                                     self.fuel_columns, 'fuel'),
+            ]),
+
+            self.create_whitespace(10),
+
+            self.create_text_card(
+                'Répartition des stations en France par ville'
+                ' et prix des carburants', 'id-folium-map'),
+        ]
+
+    def setup_footer(self):
+        return html.Footer([
+            html.Div([
+                # Logo UNIV
+                html.Img(
+                    src=self.app.get_asset_url('logo_univ.png'),
+                    style={
+                        'border-radius': '5px',
+                        'max-width': '10%',
+                        'max-height': '100%',
+                    }
+                ),
+
+                dbc.Col(
+                    html.Div(
+                        'Copyright © 2023 / 2024',
+                        style={
+                            'text-align': 'center',
+                            'font-size': '12px',
+                            'font-style': 'italic'
+
+                        },
+                    ),
+                    md=3
+                ),
+
+                dbc.Col(
+                    html.Div(
+                        'CARANGEOT Hugo / SALI--ORLIANGE Lucas, encadrés par '
+                        'Monsieur COURIVAUD D.',
+                        style={
+                            'text-align': 'center',
+                            'font-size': '12px'
+                            },
+                    ),
+                    md=3
+                ),
+
+                dbc.Col(
+                    html.Div(
+                        'DSIA-4101A : Python pour la Data Science',
+                        style={
+                            'text-align': 'center',
+                            'font-size': '12px',
+                            'text-decoration': 'underline'
+                        },
+                    ),
+                    md=3
+                ),
+
+                # Logo ESIEE
+                html.Img(
+                    src=self.app.get_asset_url('logo_esiee.png'),
+                    style={
+                        'border-radius': '5px',
+                        'max-width': '10%',
+                        'max-height': '100%',
+                    }
+                ),
+            ],
+                style={
+                    'display': 'flex',
+                    'justify-content': 'space-between',
+                    'color': '#1A1A1A',
+                    'border': '1px solid #1A1A1A',
+                    'height': '4.5rem',
+                    'align-items': 'center',
+                    'padding': '10px',
+                    'border-radius': '5px',
+                    'position': 'sticky',
+                    'bottom': '0',
+                    'z-index': '1',
+                })
+        ])
 
     def get_data_from_area(self, area):
         if area != 'France':
@@ -307,7 +511,6 @@ class DashboardHolder:
             marker={'color': 'lightblue'}
         ))
 
-        # Add trace for difference data
         for i, row in merged_percentage.iterrows():
             diff = round(row['area_per'] - row['nat_per'])
 
@@ -460,14 +663,13 @@ class DashboardHolder:
                            'font-weight': 'bold',
                            'text-decoration': 'underline',
                            'font-family': 'Roboto, sans-serif'
-                       }
-                       )
+                       })
 
     @staticmethod
     def set_date(update_date):
         return html.Div(f"Dernière mise à jour des données : {update_date}",
-                        style={'text-align': 'right', 'font-size': '17px',
-                               'color': 'darkorange',
+                        style={'text-align': 'right', 'font-size': '20px',
+                               'color': 'orange',
                                'font-weight': 'bold'})
 
     @staticmethod
@@ -550,7 +752,7 @@ class DashboardHolder:
         if callback:
             body_content = dcc.Graph(id=graph_id)
         else:
-            body_content = dcc.Graph(figure=generate_static_graph)
+            body_content = dcc.Graph(figure=generate_static_graph, )
         return dbc.Card(
             dbc.CardBody(body_content)
         )
@@ -597,7 +799,8 @@ class DashboardHolder:
 
 
 if __name__ == '__main__':
-    price_columns_list = ['Gazole', 'SP98', 'SP95', 'E85', 'E10', 'GPLc']
+    price_columns_list = ['Gazole', 'SP98', 'SP95',
+                          'E85', 'E10', 'GPLc']
     date = 'date test'
     df = pd.read_csv('processed_data.csv')
     dashboard = DashboardHolder(df, price_columns_list, date)
