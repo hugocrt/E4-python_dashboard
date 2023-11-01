@@ -1,4 +1,6 @@
-"""Module providing methods on our specific dataframe"""
+"""
+    Module providing methods on our specific dataframe
+"""
 from tkinter import messagebox
 from pathlib import Path
 import pandas as pd
@@ -6,28 +8,21 @@ import pandas as pd
 
 class DataFrameHolder:
     """
-    A class to hold and process a DataFrame for E4 python projet at ESIEE
-    PARIS
+    A class to hold and process a DataFrame for the E4 Python project at ESIEE
+    PARIS.
 
-    :param:
-        current_dir (Path): The current directory path.
-        _data_frame (pd.DataFrame): The DataFrame to be processed.
-        _fuel_columns (list): List of column names containing price
-        information
+    Args:
+        file_name (str): The name of the CSV file to be opened.
     """
-
     def __init__(self, file_name):
         """
-        Initializes a DataFrameHolder object
+        Initializes a DataFrameHolder object.
 
-        :param:
-            file_name (str): The name of the CSV file to be opened
+        Args:
+            file_name (str): The name of the CSV file to be opened.
         """
-        # Set the current file directory for opening and saving file
         self.current_dir = Path(__file__).resolve().parent
-        # Set a dataframe for further processes
         self._data_frame = self.load_csv_file(file_name)
-        # Set the fuels
         self._fuel_columns = ['Gazole_prix', 'SP98_prix', 'SP95_prix',
                               'E85_prix', 'E10_prix', 'GPLc_prix']
 
@@ -36,36 +31,39 @@ class DataFrameHolder:
         """
         Get the fuel list.
 
-        :return: The list of fuels.
-        :rtype: list of str
+        Returns:
+            list of str: The list of fuels.
         """
         return self._fuel_columns
 
     @property
     def data_frame(self):
         """
-        Get the dataframe.
+        Get the DataFrame.
 
-        :return: dataframe.
-        :rtype: pandas dataframe
+        Returns:
+            pandas DataFrame: The DataFrame.
         """
         return self._data_frame
 
     def load_csv_file(self, file_name):
         """
-        Loads a CSV file from the 'fetcher' directory
+        Loads a CSV file from the 'fetcher' directory.
 
-        :param:
-            file_name (str): The name of the CSV file to be loaded
+        Args:
+            file_name (str): The name of the CSV file to be loaded.
 
-        :return: pd.DataFrame or None: If successful, returns a DataFrame
-        with the CSV data. If an error occurs, returns None and displays an
-        error message.
+        Returns:
+            pd.DataFrame or None: If successful, returns a DataFrame with the
+            CSV data. If an error occurs, returns None and displays an error
+            message.
         """
-        # Retrieve the upper directory and go in the web_scraper directory
+        # Navigate to the parent directory and access the "web_scraper"
+        # directory.
         csv_path = self.current_dir.parent / 'web_scraper' / file_name
-        # Errors handling, we try to open the file, if we got an error print
-        # it in a box (with tk)
+
+        # Errorshandling : we attempt to open the file, and if an error
+        # occurs, display an error message through tkinter
         try:
             return pd.read_csv(csv_path, dtype={'Code postal': 'str'},
                                delimiter=';')
@@ -84,11 +82,9 @@ class DataFrameHolder:
     def process_data(self):
         """
         Processes the data by performing data cleaning and computing a new
-        DataFrame
+        DataFrame.
         """
-        # First we need to clean csv data
         self._data_cleaning()
-        # Then we can apply our different processes
         self._compute_new_dataframe()
 
     def _data_cleaning(self):
@@ -98,25 +94,21 @@ class DataFrameHolder:
         useful_columns = (['Région', 'Département', 'Code postal', 'Ville',
                            'geom'] + self.price_columns)
 
-        # We do not need the others columns for our application
         self._data_frame = self._data_frame[useful_columns]
-        # We need unique key to perform grouping (ville is not sufficient, can
-        # have same names in different area)
         self._data_frame['cp_ville'] = (self._data_frame['Code postal'] + ' '
                                         + self._data_frame['Ville'])
-        # Then we do not have use of these
-        self._data_frame = (
-            self._data_frame.drop(columns=['Ville', 'Code postal']))
+        self._data_frame = (self._data_frame.drop(
+            columns=['Ville', 'Code postal']))
 
         self._data_frame = self._data_frame.rename(
-            columns={fuel: fuel.split('_')[0] for fuel in self._fuel_columns})
-        # There are data without specify (Région, département, Ville) so we
-        # delete these
-        self._data_frame = self._data_frame.dropna(subset=['Région'])
-        self._fuel_columns = [col.split('_')[0] for col in self._fuel_columns]
+            columns={fuel: fuel.split('_', maxsplit=1)[0] for fuel in
+                     self._fuel_columns})
 
-        # Split geom and floating them to have latitude and longitude for
-        # further application
+        # Delete data without specify (Région, département, Ville)
+        self._data_frame = self._data_frame.dropna(subset=['Région'])
+        self._fuel_columns = [col.split('_', maxsplit=1)[0] for col in self._fuel_columns]
+
+        # Split geom and floating them to get latitude and longitude
         self._data_frame['geom'] = (
             self._data_frame['geom'].
             apply(
@@ -126,27 +118,27 @@ class DataFrameHolder:
         """
         Computes a new DataFrame by performing various operations.
         """
-        # Mapping to have region and department linked to each city
+        # Mapping region and department linked to each city
         city_geo_mapping = (
             self._data_frame.groupby('cp_ville')[['Région', 'Département']]
             .first().reset_index())
 
-        # Performing the average prices for each city
+        # Performing average prices per city
         city_prices_means = (
             self._data_frame.groupby('cp_ville')[self._fuel_columns].mean()
             .reset_index())
 
-        # Performing the average coordinates for each city
+        # Performing the average coordinates per city
         city_coords_means = (self._data_frame.groupby('cp_ville')['geom']
                              .apply(self._mean_coords)
                              .reset_index(level=1, drop=True)
                              .reset_index())
 
-        # Count how many times a city appears
+        # Count occurrences per city
         city_app_count = (self._data_frame.groupby('cp_ville').size()
                           .reset_index(name='Nombre de stations'))
 
-        # merge all results to have one dataframe
+        # Merge all
         self._data_frame = (city_geo_mapping
                             .merge(city_prices_means, on='cp_ville')
                             .merge(city_coords_means, on='cp_ville')
@@ -157,31 +149,33 @@ class DataFrameHolder:
         """
         Computes the mean of latitude and longitude from a list of coordinates.
 
-        :param:
+        Args:
             coords_list (list): List of coordinates.
 
-        :return:
+        Returns:
             tuple: Mean latitude and mean longitude.
         """
-        # Retrieves the latitudes and longitudes
         latitudes = [coord[0] for coord in coords_list if coord]
         longitudes = [coord[1] for coord in coords_list if coord]
-        # return coordinates tuple
+
         return pd.DataFrame({'Latitude': [sum(latitudes) / len(latitudes)],
                              'Longitude': [sum(longitudes) / len(longitudes)]})
 
     def save_dataframe(self, name='processed_data.csv'):
         """
         Saves the DataFrame to a CSV file.
+
+        Args:
+            name (str, optional): The name of the output CSV file.
         """
-        # Get the visualizer directory to save data
+        # Get visualizer directory to save data
         target_dir = self.current_dir.parent / 'data_visualizer'
-        # Look if exists, if not create it
+
         if not target_dir.is_dir():
             target_dir.mkdir()
 
-        # Errors handling, we try to save the file, if we got an error print it
-        # in a box (with tk)
+        # Error handling : we attempt to open the file, and if an error
+        # occurs, display an error message through tkinter
         try:
             file_path = target_dir / name
             self._data_frame.to_csv(file_path, index=False)
