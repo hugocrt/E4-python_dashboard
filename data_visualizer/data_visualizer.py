@@ -9,6 +9,21 @@ from folium.plugins import MarkerCluster
 
 
 class DashboardHolder:
+    """
+    Initialize the DashboardHolder class.
+
+    This class serves as a container for creating and managing a Dash dashboard.
+    It takes a DataFrame containing fuel price data, a list of price columns,
+    and the last update date as input parameters. The constructor initializes
+    the dashboard and sets up its layout, validation layout, and callbacks.
+
+    Args:
+        dataframe (pd.DataFrame): A DataFrame containing fuel price data.
+
+        price_columns (list): A list of price columns to display.
+
+        lud (str): The last update date of the data.
+    """
     def __init__(self, dataframe, price_columns, lud):
         self.data_frame = dataframe
         self.fuel_columns = price_columns
@@ -24,65 +39,119 @@ class DashboardHolder:
         self.register_callbacks()
 
     def setup_layout(self):
-        self.app.layout = html.Div([
-            dcc.Location('url', refresh=False),
-            self.setup_navbar(),
+        """
+        Set up the layout for the Dash application by defining the structure
+        of the web page. It creates the navigation bar, page content area,
+        and footer for the dashboard.
+        """
+        self.app.layout = html.Div(
+            [
+                dcc.Location('url', refresh=False),
+                self.setup_navbar(),
 
-            html.Div(
-                id='page-content',
-                children=[],
-                style={
-                    'flex': '1',
-                }
-            ),
+                html.Div(
+                    id='page-content',
+                    children=[],
+                    className='page-style',
+                ),
 
-            self.setup_footer(),
-        ], style={
-            'margin': '10px',
-            'display': 'flex',
-            'flex-direction': 'column',
-            'min-height': '100vh',
-        })
+                self.setup_footer(),
+            ],
+            className='setup'
+        )
 
     def setup_validation_layout(self):
+        """
+        This method configures the validation layout for the Dash application.
+        It includes a navigation bar, page content, and initializes the default
+        layout for the home, histogram, map, and link pages. The validation
+        layout is used to unsure a consistent and well-structured application
+        layout. But also to avoid callbacks error.
+        """
         self.app.validation_layout = html.Div([
-            html.Div([
-                dcc.Location(id="url", refresh=False),
-                self.setup_navbar(),
-                self.create_whitespace(10),
-                html.Div(id="page-content", children=[], )
-            ],
-                style={'margin': '0px 100px 0px'},
+            html.Div(
+                [
+                    dcc.Location(id="url", refresh=False),
+                    self.setup_navbar(),
+                    self.create_whitespace(10),
+                    html.Div(id="page-content", children=[])
+                ],
+                className='navbar'
             ),
             self.setup_layout_home(),
             self.setup_layout_histogram(),
-            self.setup_layout_map()
+            self.setup_layout_map(),
+            self.setup_layout_link()
         ])
 
     def register_callbacks(self):
+        """
+        Register callbacks for the Dash application.
+
+        Returns:
+            None
+        """
         @self.app.callback(
             [Output(f'{area}-card', 'children')
              for area in ['reg', 'dep', 'cit']],
-
             [Input(f'{area}-dropdown', 'value')
              for area in ['reg', 'dep', 'cit']]
         )
         def update_area_card(*selected_areas):
+            """
+            This callback function updates the area cards based on the selected
+            geographic areas. It takes the selected areas as inputs and returns
+            the corresponding area cards for display.
+
+            Args:
+                *selected_areas (str): Variable number of areas for
+                generating the area cards.
+
+            Returns:
+                list: A list of area cards for display.
+            """
             return [self.generate_area_card(area) for area in selected_areas]
+
+        @self.app.callback(
+            [Output(f'fuel-{i}-card', 'children')
+             for i in ['1', '2', '3']],
+            [Input(f'fuel-{i}-dropdown', 'value')
+             for i in ['1', '2', '3']]
+        )
+        def update_fuel_card(*selected_fuels):
+            """
+            This callback function updates the fuel cards based on the selected
+            fuel types. It takes the selected fuel types as inputs and returns
+            the corresponding fuel cards for display.
+
+            Args:
+                *selected_fuels (str): Variable number of selected fuel types
+                for generating the fuel cards.
+
+            Returns:
+                list: A list of fuel cards for display.
+            """
+            return [self.generate_fuel_card(fuel) for fuel in selected_fuels]
 
         @self.app.callback(
             Output('histogram-plot', 'figure'),
             [Input('fuel-dropdown', 'value')]
         )
         def update_histogram(fuel_selected):
-            return self.generate_price_histogram(fuel_selected)
+            """
+            This callback function updates the price histogram plot based on the
+             selected fuel type. It takes the selected fuel type as an input
+             and returns a new histogram figure with updated data.
 
-        @self.app.callback(
-            Output('id-folium-map', 'children'),
-            [Input('fuel-dropdown', 'value')]
-        )
-        def update_folium_map(fuel_selected):
-            return self.generate_folium_map()
+            Args:
+                fuel_selected (str): The selected fuel type for generating the
+                price histogram.
+
+            Returns:
+                plotly.graph_objs.Figure: A Plotly figure representing the
+                updated price histogram plot.
+            """
+            return self.generate_price_histogram(fuel_selected)
 
         @self.app.callback(
             Output('dep-dropdown', 'options'),
@@ -90,12 +159,33 @@ class DashboardHolder:
              Input('switch-button', 'value')]
         )
         def update_dep_dropdown(reg, switch):
+            """
+            Update the department dropdown options based on region selection and
+            switch mode.
+
+            This callback function dynamically updates the options available in
+            the department dropdown based on the selected region and the switch
+            mode (either 'Verrouiller' (Locked) or 'Déverrouiller' (
+            Unlocked). If the switch mode is 'Verrouiller', it provides
+            options based on the departments within the selected region. If the
+            switch mode is 'Déverrouiller', it offers options for all
+            departments in the dataset.
+
+            Args:
+                reg (str): The selected region for filtering department options.
+
+                switch (str): The switch mode ('Verrouiller' or 'Déverrouiller')
+                .
+
+            Returns:
+                list: A list of dictionaries representing the available options
+                for the department dropdown.
+            """
             if switch == 'Verrouiller':
                 return [{'label': dep, 'value': dep} for dep in
                         self.from_reg_get_dep(reg)]
-            else:
-                return [{'label': dep, 'value': dep} for dep in
-                        self.data_frame['Département'].unique()]
+            return [{'label': dep, 'value': dep} for dep in
+                    self.data_frame['Département'].unique()]
 
         @self.app.callback(
             Output('cit-dropdown', 'options'),
@@ -103,46 +193,111 @@ class DashboardHolder:
              Input('switch-button', 'value')]
         )
         def update_dep_dropdown(dep, switch):
+            """
+            This callback function dynamically updates the options available in
+            the city dropdown based on the selected department and the switch
+            mode (either 'Verrouiller' (Locked) or 'Déverrouiller' (
+            Unlocked). If the switch mode is 'Verrouiller', it provides options
+            based on the cities within the selected department. If the switch
+            mode is 'Déverrouiller', it offers options for all cities in the
+            dataset.
+
+            Args:
+                dep (str): The selected department for filtering city options.
+
+                switch (str): The switch mode ('Verrouiller' or 'Déverrouiller')
+                .
+
+            Returns:
+                list: A list of dictionaries representing the available options
+                for the city dropdown.
+            """
             if switch == 'Verrouiller':
                 return [{'label': dep, 'value': dep} for dep in
                         self.from_dep_get_cities(dep)]
-            else:
-                return [{'label': dep, 'value': dep} for dep in
-                        self.data_frame['cp_ville'].unique()]
+            return [{'label': dep, 'value': dep} for dep in
+                    self.data_frame['cp_ville'].unique()]
 
         @self.app.callback(
             Output('dep-dropdown', 'value'),
             [Input('dep-dropdown', 'options')]
         )
         def set_default_dep_value(options):
+            """
+            This callback function sets the default value for the department
+            dropdown based on the available options. If there are options
+            available, it selects the first option as the default value.
+
+            Args:
+                options (list): The list of available options for the department
+                 dropdown.
+
+            Returns:
+                str or None: The default value for the department dropdown, or
+                None if there are no options.
+            """
             if options:
                 return options[0]['value']
-            else:
-                return None
+            return None
 
         @self.app.callback(
             Output('cit-dropdown', 'value'),
             [Input('cit-dropdown', 'options')]
         )
         def set_default_cit_value(options):
+            """
+            This callback function sets the default value for the city dropdown
+            based on the available options. If there are options available, it
+            selects the first option as the default value.
+
+            Args:
+                options (list): The list of available options for the city
+                dropdown.
+
+            Returns:
+                str or None: The default value for the city dropdown, or None if
+                 there are no options.
+            """
             if options:
                 return options[0]['value']
-            else:
-                return None
+            return None
 
         @self.app.callback(
             Output('page-content', 'children'),
             [Input('url', 'pathname')]
         )
         def render_page_content(pathname):
+            """
+            This callback function updates the content displayed on the web
+            application based on the URL pathname. It maps different URL
+            paths to specific layout functions, allowing users to navigate
+            between different sections of the application.
+
+            Args:
+                pathname (str): The URL pathname, which determines the content
+                to be displayed.
+
+            Returns:
+                dash.development.base_component.Component: The content to be
+                displayed on the page.
+            """
             if pathname == '/histogramme':
                 return self.setup_layout_histogram()
-            elif pathname == '/carte':
+            if pathname == '/carte':
                 return self.setup_layout_map()
-            else:
-                return self.setup_layout_home()
+            if pathname == '/liens':
+                return self.setup_layout_link()
+            return self.setup_layout_home()
 
     def generate_folium_map(self):
+        """
+        Generate a Folium map displaying markers for cities, where each marker
+        represents a city's geographical location. The map is centered on France
+        , and the markers are added based on city data from the DataFrame.
+
+        Returns:
+            dash.html.Iframe: An HTML iframe element containing the Folium map.
+        """
         france_center = [46.232193, 2.209667]
         map1 = folium.Map(
             location=france_center,
@@ -161,17 +316,21 @@ class DashboardHolder:
         map1.add_child(mc1)
         folium_map_html = map1.get_root().render()
         return html.Iframe(srcDoc=folium_map_html,
-                           style={'width': '100%', 'height': '600px'})
+                           className='folium-iframe-style'
+                           )
 
     def _get_city_popup(self, row):
         """
-        Generate the popup content for a city marker.
+        Generate the popup content for a city marker on a Folium map.
+        the popup appears when clicking on a city marker on a Folium map. The
+        popup displays information about the city, including fuel prices for
+        various fuel types and the number of stations.
 
         Args:
-            row (pd.Series): A row from the DataFrame.
+            row (pd.Series): A row from the DataFrame containing city data.
 
         Returns:
-            folium.Popup: A Popup object.
+            folium.Popup: A Popup object containing the city information.
         """
         popup_title = f"<h4>{row['cp_ville']}</h4>"
 
@@ -193,6 +352,21 @@ class DashboardHolder:
                             max_width=300)
 
     def _add_cities_markers(self, dataf, mc):
+        """
+        Add city markers to a Folium map. For each city specified in a DataFrame
+        . Each marker is placed at the geographical coordinates (latitude and
+        longitude) of the city and includes a popup with information about the
+        city.
+
+        Args:
+            dataf (pandas.DataFrame): The DataFrame containing city data with
+            latitude and longitude columns.
+
+            mc (folium.Map): The Folium map to which markers will be added.
+
+        Returns:
+            None
+        """
         for _, row in dataf.iterrows():
             folium.Marker(
                 location=[row['Latitude'], row['Longitude']],
@@ -200,6 +374,19 @@ class DashboardHolder:
             ).add_to(mc)
 
     def generate_price_histogram(self, selected_fuel='Gazole'):
+        """
+        Generate a price histogram chart showing the distribution of prices for
+        a selected fuel type in France. The chart includes a specified number of
+         bins to display the data.
+
+        Args:
+            selected_fuel (str): The fuel type for which the price histogram
+            will be generated.
+
+        Returns:
+            plotly.graph_objs._figure.Figure: A Plotly figure representing the
+            generated price histogram.
+        """
         histogram_fig = px.histogram(
             self.data_frame,
             x=selected_fuel,
@@ -216,18 +403,52 @@ class DashboardHolder:
 
     @staticmethod
     def generate_color_mapping(list_to_map):
+        """
+            Generate a color mapping that associates a unique color with each
+            item in a list. The colors are selected from a predefined color
+            scale.
+
+            Args:
+                list_to_map (list): A list of items to be mapped to colors.
+
+            Returns:
+                dict: A dictionary mapping items in the list to unique colors.
+            """
         color_mapping = {}
         color_scale = px.colors.qualitative.Light24_r
-        for i in range(len(list_to_map)):
-            color_mapping[list_to_map[i]] = color_scale[i]
-
+        for i, items in enumerate(list_to_map):
+            color_mapping[items] = color_scale[i]
         return color_mapping
 
     @staticmethod
-    def generate_pie_chart(df, names_column, values_column, title,
+    def generate_pie_chart(dataframe, names_column, values_column, title,
                            color_mapping):
+        """
+        Generate a pie chart based on DataFrame data showing the distribution of
+         values in a specified column. It allows customization of the chart
+         title, color mapping, and other visual aspects.
+
+        Args:
+            dataframe (pandas.DataFrame): The DataFrame containing the data for
+            the pie chart.
+
+            names_column (str): The column in the DataFrame representing the
+            names of the pie chart slices.
+
+            values_column (str): The column in the DataFrame representing the
+            values of the pie chart slices.
+
+            title (str): The title of the pie chart.
+
+            color_mapping (dict): A dictionary mapping names to colors for
+            slices.
+
+        Returns:
+            plotly.graph_objs._figure.Figure: A Plotly figure representing the
+            generated pie chart.
+        """
         fig = px.pie(
-            df,
+            dataframe,
             names=names_column,
             values=values_column,
             title=title,
@@ -241,28 +462,51 @@ class DashboardHolder:
 
     @staticmethod
     def setup_navbar():
+        """
+        Set up the navigation bar for the web page with links to different
+        sections, including links to different sections or pages. The
+        navigation bar typically allows users to navigate to various parts of
+        the web application.
+
+        Returns:
+            dash.development.base_component.Component: A Dash component
+            representing the navigation bar.
+        """
         return dbc.Nav([
             dbc.NavLink("Accueil", href="/", active="exact"),
             dbc.NavLink("Histogramme", href="/histogramme", active="exact"),
             dbc.NavLink("Cartographie", href="/carte", active="exact"),
+            dbc.NavLink("Liens", href="/liens", active="exact"),
         ],
             horizontal=True,
             pills=True,
         )
 
     def setup_layout_home(self):
-        return [
-            dbc.Card([
-                dbc.CardBody([
-                    self.set_title(
-                        'Prix et répartition des carburants par ville en '
-                        'France métropolitaine'),
+        """
+        Set up the home layout for the web page with fuel prices and
+        distribution by city, including creating a header card with the title
+        and date, switch buttons for changing the view, dropdowns for
+        selecting region, department, and city, and cards for displaying fuel
+        prices and distribution by city.
 
-                    html.Div(self.set_date(self.last_update_date)),
-                ])
-            ], style={'background-color': '#f0f0f0',
-                      'border-radius': '10px'},
-                className='header-box'),
+        Returns:
+            list: A list of Dash components representing the home layout of the
+            web page.
+        """
+        return [
+            dbc.Card(
+                [
+                    dbc.CardBody([
+                        self.set_title(
+                            'Prix et répartition des carburants par ville en '
+                            'France métropolitaine'),
+
+                        html.Div(self.set_date(self.last_update_date)),
+                    ])
+                ],
+                className='header-box'
+            ),
 
             self.create_whitespace(5),
 
@@ -284,29 +528,42 @@ class DashboardHolder:
 
                 dbc.Row([
                     dbc.Col(self.generate_area_card('France'), md=3,
-                            style={'padding': '0'}),
-                    dbc.Col(id='reg-card', md=3, style={'padding': '0'}),
-                    dbc.Col(id='dep-card', md=3, style={'padding': '0'}),
-                    dbc.Col(id='cit-card', md=3, style={'padding': '0'})
+                            className='area-card-home'
+                            ),
+                    dbc.Col(id='reg-card', md=3, className='area-card-home'),
+                    dbc.Col(id='dep-card', md=3, className='area-card-home'),
+                    dbc.Col(id='cit-card', md=3, className='area-card-home')
                 ]),
             ]),
         ]
 
     def setup_layout_histogram(self):
-        return [
-            dbc.Card([
-                dbc.CardBody([
-                    self.set_title(
-                        'Distribution des stations essence en France'),
+        """
+        Set up the layout for the web page with histograms and pie charts,
+        including creating a header card with the title and date, histograms
+        for fuel distribution, and pie charts showing the distribution of
+        stations by region and cities per region.
 
-                    html.Div(self.set_date(self.last_update_date)),
-                ])
-            ], style={'background-color': '#f0f0f0',
-                      'border-radius': '10px'},
-                className='header-box'),
+        Returns:
+            list: A list of Dash components representing the layout of the web
+            page.
+        """
+        return [
+            dbc.Card(
+                [
+                    dbc.CardBody([
+                        self.set_title(
+                            'Distribution des stations essence en France'),
+
+                        html.Div(self.set_date(self.last_update_date)),
+                    ])
+                ],
+                className='header-box'
+            ),
 
             self.create_whitespace(5),
 
+            # Histogram
             dbc.Col([
                 self.create_dropdown('Sélectionnez le carburant :',
                                      self.fuel_columns, 'fuel'),
@@ -316,6 +573,7 @@ class DashboardHolder:
             self.create_whitespace(10),
 
             dbc.Col([
+                # Regional Pie Chart
                 self.create_graph_card(
                     False,
                     generate_static_graph=self.generate_pie_chart(
@@ -326,6 +584,8 @@ class DashboardHolder:
                         self.reg_color_mapping
                     ),
                 ),
+
+                # Departmental Pie Chart
                 self.create_graph_card(
                     False,
                     generate_static_graph=self.generate_pie_chart(
@@ -346,109 +606,150 @@ class DashboardHolder:
         ]
 
     def setup_layout_map(self):
-        return [
-            dbc.Card([
-                dbc.CardBody([
-                    self.set_title(
-                        'Répartition des stations en France par ville'
-                        ' et prix des carburants'),
+        """
+        Set up the layout for the web page with a map displaying fuel station
+        distribution and prices including creating a header card with the
+        title and date, and a map displaying the distribution of fuel
+        stations in France by city and fuel prices.
 
-                    html.Div(self.set_date(self.last_update_date)),
-                ])
-            ], style={'background-color': '#f0f0f0',
-                      'border-radius': '10px'},
-                className='header-box'),
+        Returns:
+            list: A list of Dash components representing the layout of the web
+            page.
+        """
+        return [
+            dbc.Card(
+                [
+                    dbc.CardBody([
+                        self.set_title(
+                            'Répartition des stations en France par ville'
+                            ' et prix des carburants'),
+
+                        html.Div(self.set_date(self.last_update_date)),
+                    ])
+                ],
+                className='header-box'
+            ),
 
             self.create_whitespace(5),
 
-            dbc.Col([
-                self.create_dropdown('Sélectionnez le carburant :',
-                                     self.fuel_columns, 'fuel'),
-            ]),
+            html.Div(self.generate_folium_map())
+        ]
 
-            self.create_whitespace(10),
+    def setup_layout_link(self):
+        """
+        Set up the layout for the web page with data relationships and
+        dropdowns. Including creating a header card with the title and date,
+        dropdowns for selecting fuel types, and card placeholders for displaying
+         data relationships.
 
-            self.create_text_card(
-                'Répartition des stations en France par ville'
-                ' et prix des carburants', 'id-folium-map'),
+        Returns:
+            list: A list of Dash components representing the layout of the web
+            page.
+        """
+        return [
+            dbc.Card(
+                [
+                    dbc.CardBody([
+                        self.set_title('Relation entre les données'),
+                        html.Div(self.set_date(self.last_update_date)),
+                    ])
+                ],
+                className='header-box'
+            ),
+
+            self.create_whitespace(5),
+
+            html.Div([
+                dbc.Row([
+                    dbc.Col(self.create_dropdown('Sélectionnez le carburant :',
+                                                 self.fuel_columns, 'fuel-1',
+                                                 'Gazole')),
+                    dbc.Col(self.create_dropdown('Sélectionnez le carburant :',
+                                                 self.fuel_columns,
+                                                 'fuel-2',
+                                                 value='SP98')),
+                    dbc.Col(self.create_dropdown('Sélectionnez le carburant :',
+                                                 self.fuel_columns, 'fuel-3',
+                                                 value='SP95')),
+                ]),
+
+                self.create_whitespace(5),
+
+                dbc.Row([
+                    dbc.Col(id='fuel-1-card', md=4, style={'padding': '10'}),
+                    dbc.Col(id='fuel-2-card', md=4, style={'padding': '10'}),
+                    dbc.Col(id='fuel-3-card', md=4, style={'padding': '10'}),
+                ])
+            ])
         ]
 
     def setup_footer(self):
+        """
+        Create a footer for the web page with copyright and attribution
+        information.
+
+        Returns:
+            dash.html.Footer: An HTML <footer> element with copyright and
+            attribution information.
+        """
         return html.Footer([
             html.Div([
-                # Logo UNIV
+                # Logo Université Gustave Eiffel
                 html.Img(
                     src=self.app.get_asset_url('logo_univ.png'),
-                    style={
-                        'border-radius': '5px',
-                        'max-width': '10%',
-                        'max-height': '100%',
-                    }
+                    className='logo'
                 ),
 
+                # Copyright
                 dbc.Col(
                     html.Div(
                         'Copyright © 2023 / 2024',
-                        style={
-                            'text-align': 'center',
-                            'font-size': '12px',
-                            'font-style': 'italic'
-
-                        },
+                        className='copyright'
                     ),
                     md=3
                 ),
 
+                # Credits
                 dbc.Col(
                     html.Div(
                         'CARANGEOT Hugo / SALI--ORLIANGE Lucas, encadrés par '
                         'Monsieur COURIVAUD D.',
-                        style={
-                            'text-align': 'center',
-                            'font-size': '12px'
-                            },
+                        className='credits'
                     ),
                     md=3
                 ),
 
+                # Unit
                 dbc.Col(
                     html.Div(
                         'DSIA-4101A : Python pour la Data Science',
-                        style={
-                            'text-align': 'center',
-                            'font-size': '12px',
-                            'text-decoration': 'underline'
-                        },
+                        className='unit'
                     ),
                     md=3
                 ),
 
-                # Logo ESIEE
+                # Logo ESIEE Paris
                 html.Img(
                     src=self.app.get_asset_url('logo_esiee.png'),
-                    style={
-                        'border-radius': '5px',
-                        'max-width': '10%',
-                        'max-height': '100%',
-                    }
+                    className='logo'
                 ),
-            ],
-                style={
-                    'display': 'flex',
-                    'justify-content': 'space-between',
-                    'color': '#1A1A1A',
-                    'border': '1px solid #1A1A1A',
-                    'height': '4.5rem',
-                    'align-items': 'center',
-                    'padding': '10px',
-                    'border-radius': '5px',
-                    'position': 'sticky',
-                    'bottom': '0',
-                    'z-index': '1',
-                })
+            ], className='footer')
         ])
 
     def get_data_from_area(self, area):
+        """
+        Retrieves and returns a subset of the dataset, filtering it by a
+        specific geographic area. The area can be defined by its name,
+        which could be a region, department, or "France" for the entire country.
+
+        Args:
+            area (str): The name of the geographic area for which to retrieve
+            data.
+
+        Returns:
+            pandas.DataFrame: A DataFrame containing the data filtered by the
+            specified area.
+        """
         if area != 'France':
             if area[0].isdigit():
                 area_query = 'cp_ville'
@@ -457,10 +758,23 @@ class DashboardHolder:
             else:
                 area_query = 'Département'
             return self.data_frame.query(f'{area_query} == "{area}"')
-        else:
-            return self.data_frame
+
+        return self.data_frame
 
     def generate_average_barchart(self, area):
+        """
+        Generate a bar chart comparing the percentage of fuel availability
+        in a specific area to the national average. It displays both the
+        area's percentage and the difference (if any) from the national average.
+
+        Args:
+            area (str): The name of the geographic area for which to generate
+            the bar chart.
+
+        Returns:
+            plotly.graph_objs._figure.Figure: A Plotly figure representing the
+            bar chart.
+        """
         data = self.get_data_from_area(area)
         national_data = self.get_data_from_area('France')
 
@@ -511,12 +825,12 @@ class DashboardHolder:
             marker={'color': 'lightblue'}
         ))
 
-        for i, row in merged_percentage.iterrows():
+        for _, row in merged_percentage.iterrows():
             diff = round(row['area_per'] - row['nat_per'])
 
             if diff == 0:
                 continue
-            elif diff > 0:
+            if diff > 0:
                 diff_text = f'+{diff}%'
                 color = 'lightgreen'
             else:
@@ -555,7 +869,96 @@ class DashboardHolder:
 
         return fig
 
+    def display_fuel_info(self, fuel):
+        """
+        Generate information about fuel prices in regions and departments.
+        Creates a list of HTML elements that provide information about fuel
+        prices in the specified regions and departments. It includes the top
+        5 and bottom 5 regions/departments with the highest and lowest fuel
+        prices.
+
+        Args:
+            fuel (str): The type of fuel to display information for.
+
+        Returns:
+            dash.html.Ul: An HTML <ul> element containing the information about
+            fuel prices.
+        """
+        list_area = ['Région', 'Département']
+
+        text_fuel_list = []
+
+        for area in list_area:
+            avg_fuel_price = self.data_frame.groupby(area)[fuel].mean(
+            ).reset_index()
+            top_5 = avg_fuel_price.nlargest(5, fuel).sort_values(by=fuel,
+                                                                 ascending=False)
+            min_5 = avg_fuel_price.nsmallest(5, fuel).sort_values(by=fuel,
+                                                                  ascending=True)
+
+            text_fuel_list.extend([
+                html.H5(
+                    f'5 {area}s les plus chères' if area == 'Région'
+                    else f'5 {area}s les plus chèrs',
+                    className='card-body-title'
+                ),
+
+                html.Ol([
+                    html.Li(
+                        [
+                            html.Span(f"{row[1][area]} : ",
+                                      className='span-text-info'
+                                      ),
+                            f"{row[1][fuel]:.3f} €/L"
+                        ]
+                    )
+                    for row in top_5.iterrows()
+                ], className='font12'
+                ),
+
+                html.Hr(),
+
+                html.H5(
+                    f'5 {area}s les moins chères' if area == 'Région'
+                    else f'5 {area}s les moins chèrs',
+                    className='card-body-title'),
+
+                html.Ol([
+                    html.Li(
+                        [
+                            html.Span(f"{row[1][area]} : ",
+                                      className='span-text-info'
+                                      ),
+                            f"{row[1][fuel]:.3f} €/L"
+                        ]
+                    )
+                    for row in min_5.iterrows()
+                ], className='font12'
+                )
+            ])
+
+            if area == 'Région':
+                text_fuel_list.append(
+                    html.Hr()
+                )
+
+        return html.Ul(text_fuel_list)
+
     def display_text_info(self, area):
+        """
+        Generate a list of HTML elements containing information about a
+        specific geographic area. It provides information about a specified
+        geographic area, including average fuel prices, price differences
+        with the national average, city and station counts, and related data.
+
+        Args:
+            area (str): The name of the geographic area for which information
+            is to be displayed.
+
+        Returns:
+            dash.html.Ul: An HTML <ul> element containing the information about
+            the area.
+        """
         area_data = self.get_data_from_area(area)
         avg_area_price = area_data[self.fuel_columns].mean()
         area_stations_count = area_data['Nombre de stations'].sum()
@@ -570,12 +973,11 @@ class DashboardHolder:
         for fuel in self.fuel_columns:
             price = avg_area_price[fuel]
             if pd.notna(price):
-                price_text = (html.Span(
-                    fuel,
-                    style={'font-weight': 'bold', 'color': 'black'}),
-                              html.Span(
-                                  f' : {price:.3f} €/L')
+                price_text = (
+                    html.Span(fuel, className='span-text-info'),
+                    html.Span(f' : {price:.3f} €/L')
                 )
+
                 price_diff_text = None
                 color = 'black'
 
@@ -593,25 +995,24 @@ class DashboardHolder:
                     else:
                         price_diff_text += ' ▼'
                         color = 'green'
-
             else:
-                price_text = (html.Span(
-                    fuel,
-                    style={'font-weight': 'bold', 'color': 'black'}),
-                              html.Span(f' : Non disponible')
+                price_text = (
+                    html.Span(fuel, className='span-text-info'),
+                    html.Span(' : Non disponible')
                 )
+
                 price_diff_text = None
                 color = 'grey'
 
-            text_info_list.append(html.Li(
-                [
-                    html.Span(price_text),
-                    html.Span(
-                        price_diff_text,
-                        style={'color': color}
-                    ) if price_diff_text else None
-                ]
-            ))
+            text_info_list.append(
+                html.Li(
+                    [
+                        html.Span(price_text),
+                        html.Span(price_diff_text, style={'color': color}) if
+                        price_diff_text else None
+                    ]
+                )
+            )
 
         if area in self.reg:
             area_cs_count = (self.data_frame.groupby('Région')['cp_ville']
@@ -629,86 +1030,160 @@ class DashboardHolder:
             color = 'grey'
 
         area_stations_rate = (
-                    area_stations_count / national_stations_count * 100)
-        area_cs_rate = (area_cs_count / national_cs_count * 100)
+                area_stations_count / national_stations_count * 100)
+        area_cs_rate = area_cs_count / national_cs_count * 100
 
         text_info_list.append(
-                html.Div(
-                    [
-                        html.Br(),
-                        html.Span(f'Nombre de villes avec stations : ',
-                                  style={'color': color}),
-                        html.Br(),
-                        html.Span(f'{area_cs_count} ⇔ ({area_cs_rate:.2f}%)',
-                                  style={'color': color}),
-                        html.Br(),
-                        html.Span(f'Nombre de stations : ',
-                                  style={'color': 'grey'}),
-                        html.Br(),
-                        html.Span(f'{area_stations_count} ⇔ ('
-                                  f'{area_stations_rate:.2f}%)',
-                                  style={'color': 'grey'})
-                    ],
-                    style={'font-size': '12px'})
+            html.Div(
+                [
+                    html.Br(),
+                    html.Span('Nombre de villes avec stations : ',
+                              style={'color': color}),
+
+                    html.Br(),
+                    html.Span(f'{area_cs_count} ⇔ ({area_cs_rate:.2f}%)',
+                              style={'color': color}),
+
+                    html.Br(),
+                    html.Span('Nombre de stations : ', className='span-color'),
+
+                    html.Br(),
+                    html.Span(f'{area_stations_count} ⇔ ('
+                              f'{area_stations_rate:.2f}%)',
+                              className='span-color')
+                ],
+                className='font12')
         )
 
         return html.Ul(text_info_list)
 
     @staticmethod
     def set_title(title_text):
+        """
+        Create an H1 element to display the main title.
+
+        Args:
+            title_text (str): The text to display as the main title.
+
+        Returns:
+            dash.html.H1: An HTML <h1> element with the specified title text.
+        """
         return html.H1(title_text,
-                       style={
-                           'text-align': 'center',
-                           'margin-bottom': '20px',
-                           'font-weight': 'bold',
-                           'text-decoration': 'underline',
-                           'font-family': 'Roboto, sans-serif'
-                       })
+                       className='main-title',
+                       )
 
     @staticmethod
     def set_date(update_date):
+        """
+        Create a Div element to display the last data update date.
+
+        Args:
+            update_date (str): The date to display as the last data update date.
+
+        Returns:
+            dash.html.Div: An HTML <div> element with the specified update date.
+        """
         return html.Div(f"Dernière mise à jour des données : {update_date}",
-                        style={'text-align': 'right', 'font-size': '20px',
-                               'color': 'orange',
-                               'font-weight': 'bold'})
+                        className='date'
+                        )
 
     @staticmethod
-    def create_dropdown(ptext, plist, id_dropdown):
-        if not type(plist) == pd.Series:
+    def create_dropdown(ptext, plist, id_dropdown, value=None):
+        """
+        This function generates a Dash Dropdown component for selecting options
+         from a list.
+
+        Args:
+            ptext (str): The label or text to display next to the dropdown.
+
+            plist (pd.Series or iterable): The list of options to populate the
+            dropdown.
+
+            id_dropdown (str): The ID to assign to the dropdown.
+
+            value (str or None, optional): The default selected value for the
+            dropdown. If None, the first option is selected.
+
+        Returns:
+            dash.development.web.Dropdown: A Dash Dropdown component with the
+            specified label, options, and ID.
+        """
+        if not isinstance(plist, pd.Series):
             plist = pd.Series(plist)
-        return dbc.Col([
-            html.Label(ptext),
-            dcc.Dropdown(
-                id=f'{id_dropdown}-dropdown',
-                options=[{'label': element, 'value': element}
-                         for element in plist.unique()],
-                value=plist.unique()[0],
-                clearable=False
-            ),
-        ], md=3)
 
-    @staticmethod
-    def create_text_card(header_name, body_id):
-        class_name = 'card-title text-center'
-        first_word = header_name.split('-')[0]
-        if first_word == 'id':
-            h5_tag = html.H5(id=header_name, className=class_name)
-        else:
-            h5_tag = html.H5(header_name, className=class_name)
+        if id_dropdown.split('-')[0] == 'fuel' and value is not None:
+            return dbc.Col(
+                [
+                    html.Label(ptext),
+                    dcc.Dropdown(
+                        id=f'{id_dropdown}-dropdown',
+                        options=[{'label': element, 'value': element}
+                                 for element in plist.unique()],
+                        value=value,
+                        clearable=False
+                    ),
+                ],
+                md=12
+            )
 
+        return dbc.Col(
+            [
+                html.Label(ptext),
+                dcc.Dropdown(
+                    id=f'{id_dropdown}-dropdown',
+                    options=[{'label': element, 'value': element}
+                             for element in plist.unique()],
+                    value=plist.unique()[0],
+                    clearable=False
+                ),
+            ],
+                md=3
+            )
+
+    def generate_fuel_card(self, fuel):
+        """
+        Generate a card component displaying information for a specific
+        fuel, including a title, data.
+
+        Args:
+            fuel (str): The name of the fuel to display information
+            for.
+
+        Returns:
+            dash_bootstrap_components.Card: A card component containing
+            information.
+        """
         return dbc.Card(
             [
-                dbc.CardHeader(h5_tag),
-                dbc.CardBody(html.Div(id=body_id))
+                dbc.CardHeader(
+                    html.H5(fuel,
+                            className='font12'
+                            ),
+                    className='card-header'
+                ),
+
+                dbc.CardBody([
+                    self.display_fuel_info(fuel)
+                ],
+                    className='card-body-fuel'
+                )
             ],
+            className='card-style',
         )
 
     def generate_area_card(self, area):
-        title_style = {
-            'text-align': 'center',
-            'text-decoration': 'underline',
-            'font-size': '10px'
-        }
+        """
+        Generate a card component displaying information for a specific
+        geographic area, including a title, data, and a Plotly graph.
+
+        Args:
+            area (str): The name of the geographic area to display information
+            for.
+
+        Returns:
+            dash_bootstrap_components.Card: A card component containing
+            information and a graph.
+        """
         if area == 'France':
             text_title = 'Prix moyens sur le territoire français métropolitain'
             text_graph = ('Distribution des carburants sur le territoire '
@@ -722,33 +1197,52 @@ class DashboardHolder:
             [
                 dbc.CardHeader(
                     html.H5(area,
-                            className='card-title text-center',
-                            style={'font-size': '12px'}
-                            ),
-                    style={'display': 'flex',
-                           'align-items': 'center',
-                           'justify-content': 'center'}
+                            className='font12'),
+                    className='card-header'
                 ),
 
                 dbc.CardBody([
-                    html.Div(html.H5(text_title, style=title_style)),
+                    html.Div(html.H5(text_title,
+                                     className='card-body-title')
+                             ),
+
                     html.Div(self.display_text_info(area)),
 
                     html.Hr(),
 
-                    html.Div(html.H5(text_graph, style=title_style)),
+                    html.Div(html.H5(text_graph,
+                                     className='card-body-title')
+                             ),
+
                     dcc.Graph(
                         figure=self.generate_average_barchart(area),
                         config={'displayModeBar': False}
                     )
                 ])
             ],
-            style={'border-radius': '10px'}
+            className='card-style',
         )
 
     @staticmethod
     def create_graph_card(callback, graph_id=None,
                           generate_static_graph=None):
+        """
+        Create a card containing a Plotly graph component.
+
+        Args:
+            callback (bool): If True, the graph component will have an ID
+            specified by 'graph_id'.
+
+            graph_id (str, optional): The ID to assign to the graph component
+            when 'callback' is True.
+
+            generate_static_graph (plotly.graph_objs.Figure, optional): The
+            static Plotly graph to display when 'callback' is False.
+
+        Returns:
+            dash_bootstrap_components.Card: A card containing the specified
+            graph component.
+        """
         if callback:
             body_content = dcc.Graph(id=graph_id)
         else:
@@ -759,14 +1253,44 @@ class DashboardHolder:
 
     @staticmethod
     def create_whitespace(space):
+        """
+        Create a whitespace element with a specified margin-bottom in pixels.
+
+        Args:
+            space (int): The amount of margin-bottom (in pixels) to add to
+            the whitespace element.
+
+        Returns:
+            dash.html.Div: An HTML <div> element with the specified
+            margin-bottom.
+        """
         return html.Div(style={'margin-bottom': f'{space}px'})
 
     def from_reg_get_dep(self, reg):
+        """
+        Retrieve a list of unique departments in a specified French region.
+
+        Args:
+            reg (str): French region to filter the data.
+
+        Returns:
+            list : A list of unique French departments in the specified
+            department.
+        """
         filtered_data = self.data_frame.query(f'Région == "{reg}"')
         departments = filtered_data['Département'].unique().tolist()
         return departments
 
     def from_dep_get_cities(self, dep):
+        """
+        Retrieve a list of unique cities in a specified French department.
+
+        Args:
+            dep (str): French department to filter the data.
+
+        Returns:
+            cities : A list of unique French cities in the specified department.
+        """
         filtered_data = self.data_frame.query(f'Département == "{dep}"')
         cities = filtered_data['cp_ville'].unique().tolist()
         return cities
@@ -793,7 +1317,7 @@ class DashboardHolder:
                 options=options,
                 value=options[0]['value'],
                 labelStyle={'display': 'flex'},
-                style={'margin-top': '10px', 'margin-bottom': '10px'}
+                className='radio-items',
             ), md=3
         )
 
@@ -801,7 +1325,7 @@ class DashboardHolder:
 if __name__ == '__main__':
     price_columns_list = ['Gazole', 'SP98', 'SP95',
                           'E85', 'E10', 'GPLc']
-    date = 'date test'
+    DATE = 'date test'
     df = pd.read_csv('processed_data.csv')
-    dashboard = DashboardHolder(df, price_columns_list, date)
+    dashboard = DashboardHolder(df, price_columns_list, DATE)
     dashboard.app.run_server(debug=True)
