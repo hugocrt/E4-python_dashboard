@@ -16,9 +16,10 @@ class FirefoxScraperHolder:
     """
     def __init__(self, target_url):
         """
-            Initialize a FirefoxScraperHolder instance.
+        Initialize a FirefoxScraperHolder instance.
 
-            :param target_url: The URL to scrape data from.
+        Args:
+            target_url (str): The URL to scrape data from.
         """
         self.cwf = Path(__file__).resolve().parent
 
@@ -31,12 +32,13 @@ class FirefoxScraperHolder:
 
     def set_preferences(self):
         """
-            Set Firefox webdriver preferences
-            (Here only for downloading files)
+        Set Firefox WebDriver preferences, specifically for downloading files.
 
-            :return: The configured Firefox options.
+        Returns:
+            selenium.webdriver.firefox.options.Options: The configured Firefox
+            options.
         """
-        # 2 means we use chosen directory as download folder
+        # 2 : chosen directory as download folder
         self.options.set_preference("browser.download.folderList", 2)
         self.options.set_preference("browser.download.dir", str(self.cwf))
         return self.options
@@ -44,29 +46,34 @@ class FirefoxScraperHolder:
     @property
     def updated_data_date(self):
         """
-        Get the last updated data date.
+        Retrieve the date of the last data update.
 
-        :return: The last updated data date.
-        :rtype: str
+        Returns:
+            str: The date of the last data update.
         """
         return self._updated_data_date
 
     @property
     def csv_id(self):
         """
-        Get the filename of the downloaded CSV.
+        Retrieve the filename of the downloaded CSV.
 
-        :return: The filename of the downloaded CSV.
-        :rtype: str
+        Returns:
+            str: The filename of the downloaded CSV.
         """
         return self._csv_id
 
     def perform_scraping(self, aria_label, ng_if):
         """
-            Perform the scraping process.
+        Perform the scraping process to retrieve data from a website.
 
-            :param aria_label: ARIA label for the CSV element.
-            :param ng_if: NG-if attribute for updated data date element.
+        Args:
+            aria_label (str): The ARIA label for the CSV element.
+
+            ng_if (str): The NG-if attribute for the updated data date element.
+
+        Raises:
+            WebDriverException: If an error occurs during the scraping process.
         """
         try:
             with self.driver:
@@ -93,13 +100,18 @@ class FirefoxScraperHolder:
 
     def click_on(self, find_by, value):
         """
-            Click on a web element identified by 'find_by' and 'value'.
+        Click on a web element identified by the specified method and value.
 
-            :param find_by: The method used to find the element
-            (e.g., By.LINK_TEXT).
-            :param value: The value to search for.
+        Args:
+            find_by: The method used to find the element (e.g., By.LINK_TEXT).
+
+            value: The value to search for.
+
+        Returns:
+            None
         """
-        # Here 'wait' and 'EC' avoid error due to the loading of the website
+        # The usage of 'wait' and 'EC' is employed to prevent errors caused by
+        # website loading.
         wait = WebDriverWait(self.driver, 20)
         element = wait.until(EC.element_to_be_clickable((find_by, value)))
         element.click()
@@ -113,14 +125,17 @@ class FirefoxScraperHolder:
 
     def retrieve_text_info(self, find_by, value):
         """
-            Retrieve text information of a web element identified
-            by 'find_by' and 'value'.
+        Retrieve text information of a web element identified by 'find_by' and
+        'value'.
 
-            :param find_by: The method used to find the element
-            (e.g., By.CSS_SELECTOR).
-            :param value: The value to search for.
-            :return: The text information of the web element.
-            :rtype: str
+        Args:
+            find_by: The method used to find the element (e.g., By.CSS_SELECTOR)
+            .
+
+            value: The value to search for.
+
+        Returns:
+            str: The text information of the web element.
         """
         # Here 'wait' and 'EC' avoid error due to the loading of the website
         wait = WebDriverWait(self.driver, 20)
@@ -128,6 +143,12 @@ class FirefoxScraperHolder:
         return info.text
 
     def wait_until_download_finishes(self):
+        """
+        Wait until the download of a file finishes.
+
+        This function checks the current folder for files with a '.part' suffix
+        and waits for them to disappear, indicating the download has finished.
+        """
         dl_wait = True
         while dl_wait:
             time.sleep(5)
