@@ -14,6 +14,7 @@ class FirefoxScraperHolder:
     """
         Class for scraping data using Firefox webdriver.
     """
+
     def __init__(self, target_url):
         """
         Initialize a FirefoxScraperHolder instance.
@@ -81,24 +82,22 @@ class FirefoxScraperHolder:
                 self.driver.get(self.target_url)
 
                 # Retrieves csv information
-                self.click_on(By.LINK_TEXT, "Informations")
-                self._updated_data_date = self.retrieve_text_info(
-                    By.CSS_SELECTOR,
-                    f"[ng-if='{ng_if}']")
-                self._csv_id = self.retrieve_text_info(
-                    By.CLASS_NAME,
-                    'ods-dataset-metadata-block__metadata-value'
-                ) + '.csv'
-
+                self._click_on(By.LINK_TEXT, "Informations")
+                self._updated_data_date = self._retrieve_text_info(
+                    By.CSS_SELECTOR, f"[ng-if='{ng_if}']")
+                self._csv_id = self._retrieve_text_info(By.CLASS_NAME,
+                                                        'ods-dataset-'
+                                                        'metadata-block__meta'
+                                                        'data-value') + '.csv'
                 # Download csv
-                self.click_on(By.LINK_TEXT, "Export")
-                self.click_on(By.CSS_SELECTOR, f"[aria-label='{aria_label}']")
-                self.wait_until_download_finishes()
+                self._click_on(By.LINK_TEXT, "Export")
+                self._click_on(By.CSS_SELECTOR, f"[aria-label='{aria_label}']")
+                self._wait_until_download_finishes()
 
         except WebDriverException as exception:
             print(f"An error occurred during the get operation: {exception}")
 
-    def click_on(self, find_by, value):
+    def _click_on(self, find_by, value):
         """
         Click on a web element identified by the specified method and value.
 
@@ -123,7 +122,7 @@ class FirefoxScraperHolder:
         for file in self.cwf.glob('*.csv'):
             file.unlink(missing_ok=True)
 
-    def retrieve_text_info(self, find_by, value):
+    def _retrieve_text_info(self, find_by, value):
         """
         Retrieve text information of a web element identified by 'find_by' and
         'value'.
@@ -142,7 +141,7 @@ class FirefoxScraperHolder:
         info = wait.until(EC.visibility_of_element_located((find_by, value)))
         return info.text
 
-    def wait_until_download_finishes(self):
+    def _wait_until_download_finishes(self):
         """
         Wait until the download of a file finishes.
 

@@ -1,3 +1,4 @@
+
 """
     Module which provide the whole process from webscraping to dashboarding
 """
@@ -26,4 +27,4 @@ df_holder.save_dataframe()
 # Dashboard
 dashboard = DashboardHolder(df_holder.data_frame, df_holder.price_columns,
                             firefox_scraper.updated_data_date)
-dashboard.app.run_server()
+dashboard.run()

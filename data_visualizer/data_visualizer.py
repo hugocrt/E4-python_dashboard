@@ -1,3 +1,7 @@
+"""
+    Module that allows to display our information on the dashboard
+"""
+
 import dash
 import folium
 import pandas as pd
@@ -33,12 +37,19 @@ class DashboardHolder:
                              )
         self.dep = dataframe['Département'].unique()
         self.reg = dataframe['Région'].unique()
-        self.reg_color_mapping = self.generate_color_mapping(self.reg)
-        self.setup_layout()
-        self.setup_validation_layout()
-        self.register_callbacks()
+        self.reg_color_mapping = self._generate_color_mapping(self.reg)
+        self._setup_layout()
+        self._setup_validation_layout()
+        self._register_callbacks()
 
-    def setup_layout(self):
+    def run(self):
+        """
+            run the dashboard
+        """
+        print('server running...')
+        self.app.run_server()
+
+    def _setup_layout(self):
         """
         Set up the layout for the Dash application by defining the structure
         of the web page. It creates the navigation bar, page content area,
@@ -47,7 +58,7 @@ class DashboardHolder:
         self.app.layout = html.Div(
             [
                 dcc.Location('url', refresh=False),
-                self.setup_navbar(),
+                self._setup_navbar(),
 
                 html.Div(
                     id='page-content',
@@ -55,12 +66,12 @@ class DashboardHolder:
                     className='page-style',
                 ),
 
-                self.setup_footer(),
+                self._setup_footer(),
             ],
             className='setup'
         )
 
-    def setup_validation_layout(self):
+    def _setup_validation_layout(self):
         """
         This method configures the validation layout for the Dash application.
         It includes a navigation bar, page content, and initializes the default
@@ -72,19 +83,19 @@ class DashboardHolder:
             html.Div(
                 [
                     dcc.Location(id="url", refresh=False),
-                    self.setup_navbar(),
-                    self.create_whitespace(10),
+                    self._setup_navbar(),
+                    self._create_whitespace(10),
                     html.Div(id="page-content", children=[])
                 ],
                 className='navbar'
             ),
-            self.setup_layout_home(),
-            self.setup_layout_histogram(),
-            self.setup_layout_map(),
-            self.setup_layout_link()
+            self._setup_layout_home(),
+            self._setup_layout_distribution(),
+            self._setup_layout_map(),
+            self._setup_layout_link()
         ])
 
-    def register_callbacks(self):
+    def _register_callbacks(self):
         """
         Register callbacks for the Dash application.
 
@@ -110,7 +121,7 @@ class DashboardHolder:
             Returns:
                 list: A list of area cards for display.
             """
-            return [self.generate_area_card(area) for area in selected_areas]
+            return [self._generate_area_card(area) for area in selected_areas]
 
         @self.app.callback(
             [Output(f'fuel-{i}-card', 'children')
@@ -131,7 +142,7 @@ class DashboardHolder:
             Returns:
                 list: A list of fuel cards for display.
             """
-            return [self.generate_fuel_card(fuel) for fuel in selected_fuels]
+            return [self._generate_fuel_card(fuel) for fuel in selected_fuels]
 
         @self.app.callback(
             Output('histogram-plot', 'figure'),
@@ -151,7 +162,7 @@ class DashboardHolder:
                 plotly.graph_objs.Figure: A Plotly figure representing the
                 updated price histogram plot.
             """
-            return self.generate_price_histogram(fuel_selected)
+            return self._generate_price_histogram(fuel_selected)
 
         @self.app.callback(
             Output('dep-dropdown', 'options'),
@@ -159,64 +170,25 @@ class DashboardHolder:
              Input('switch-button', 'value')]
         )
         def update_dep_dropdown(reg, switch):
-            """
-            Update the department dropdown options based on region selection and
-            switch mode.
-
-            This callback function dynamically updates the options available in
-            the department dropdown based on the selected region and the switch
-            mode (either 'Verrouiller' (Locked) or 'Déverrouiller' (
-            Unlocked). If the switch mode is 'Verrouiller', it provides
-            options based on the departments within the selected region. If the
-            switch mode is 'Déverrouiller', it offers options for all
-            departments in the dataset.
-
-            Args:
-                reg (str): The selected region for filtering department options.
-
-                switch (str): The switch mode ('Verrouiller' or 'Déverrouiller')
-                .
-
-            Returns:
-                list: A list of dictionaries representing the available options
-                for the department dropdown.
-            """
             if switch == 'Verrouiller':
-                return [{'label': dep, 'value': dep} for dep in
-                        self.from_reg_get_dep(reg)]
-            return [{'label': dep, 'value': dep} for dep in
-                    self.data_frame['Département'].unique()]
+                dep_list = self._from_reg_get_dep(reg)
+            else:
+                dep_list = self.data_frame['Département'].unique()
+
+            return [{'label': dep, 'value': dep} for dep in dep_list]
 
         @self.app.callback(
             Output('cit-dropdown', 'options'),
             [Input('dep-dropdown', 'value'),
              Input('switch-button', 'value')]
         )
-        def update_dep_dropdown(dep, switch):
-            """
-            This callback function dynamically updates the options available in
-            the city dropdown based on the selected department and the switch
-            mode (either 'Verrouiller' (Locked) or 'Déverrouiller' (
-            Unlocked). If the switch mode is 'Verrouiller', it provides options
-            based on the cities within the selected department. If the switch
-            mode is 'Déverrouiller', it offers options for all cities in the
-            dataset.
-
-            Args:
-                dep (str): The selected department for filtering city options.
-
-                switch (str): The switch mode ('Verrouiller' or 'Déverrouiller')
-                .
-
-            Returns:
-                list: A list of dictionaries representing the available options
-                for the city dropdown.
-            """
+        def update_cit_dropdown(dep, switch):
             if switch == 'Verrouiller':
-                return [{'label': dep, 'value': dep} for dep in
-                        self.from_dep_get_cities(dep)]
-            return [{'label': dep, 'value': dep} for dep in
-                    self.data_frame['cp_ville'].unique()]
+                cities_list = self._from_dep_get_cities(dep)
+            else:
+                cities_list = self.data_frame['cp_ville'].unique()
+
+            return [{'label': cit, 'value': cit} for cit in cities_list]
 
         @self.app.callback(
             Output('dep-dropdown', 'value'),
@@ -281,15 +253,15 @@ class DashboardHolder:
                 dash.development.base_component.Component: The content to be
                 displayed on the page.
             """
-            if pathname == '/histogramme':
-                return self.setup_layout_histogram()
+            if pathname == '/distribution':
+                return self._setup_layout_distribution()
             if pathname == '/carte':
-                return self.setup_layout_map()
-            if pathname == '/liens':
-                return self.setup_layout_link()
-            return self.setup_layout_home()
+                return self._setup_layout_map()
+            if pathname == '/comparaisons':
+                return self._setup_layout_link()
+            return self._setup_layout_home()
 
-    def generate_folium_map(self):
+    def _generate_folium_map(self):
         """
         Generate a Folium map displaying markers for cities, where each marker
         represents a city's geographical location. The map is centered on France
@@ -311,9 +283,9 @@ class DashboardHolder:
             max_lon=24,
             max_bounds=True
         )
-        mc1 = MarkerCluster()
-        self._add_cities_markers(self.data_frame, mc1)
-        map1.add_child(mc1)
+        markercluster = MarkerCluster()
+        self._add_cities_markers(markercluster)
+        map1.add_child(markercluster)
         folium_map_html = map1.get_root().render()
         return html.Iframe(srcDoc=folium_map_html,
                            className='folium-iframe-style'
@@ -351,29 +323,28 @@ class DashboardHolder:
         return folium.Popup(popup_title + popup_fuel + popup_stations_count,
                             max_width=300)
 
-    def _add_cities_markers(self, dataf, mc):
+    def _add_cities_markers(self, markerc: MarkerCluster):
         """
-        Add city markers to a Folium map. For each city specified in a DataFrame
+        Add city markers to a MarkerCLuster. For each city specified in a
+        DataFrame
         . Each marker is placed at the geographical coordinates (latitude and
         longitude) of the city and includes a popup with information about the
         city.
 
         Args:
-            dataf (pandas.DataFrame): The DataFrame containing city data with
-            latitude and longitude columns.
-
-            mc (folium.Map): The Folium map to which markers will be added.
+            markerc (folium.Map): The Folium map to which markers will be
+            added.
 
         Returns:
             None
         """
-        for _, row in dataf.iterrows():
+        for _, row in self.data_frame.iterrows():
             folium.Marker(
                 location=[row['Latitude'], row['Longitude']],
                 popup=self._get_city_popup(row)
-            ).add_to(mc)
+            ).add_to(markerc)
 
-    def generate_price_histogram(self, selected_fuel='Gazole'):
+    def _generate_price_histogram(self, selected_fuel='Gazole'):
         """
         Generate a price histogram chart showing the distribution of prices for
         a selected fuel type in France. The chart includes a specified number of
@@ -402,7 +373,7 @@ class DashboardHolder:
         return histogram_fig
 
     @staticmethod
-    def generate_color_mapping(list_to_map):
+    def _generate_color_mapping(list_to_map):
         """
             Generate a color mapping that associates a unique color with each
             item in a list. The colors are selected from a predefined color
@@ -421,8 +392,8 @@ class DashboardHolder:
         return color_mapping
 
     @staticmethod
-    def generate_pie_chart(dataframe, names_column, values_column, title,
-                           color_mapping):
+    def _generate_pie_chart(dataframe, names_column, values_column,
+                            title, color_mapping):
         """
         Generate a pie chart based on DataFrame data showing the distribution of
          values in a specified column. It allows customization of the chart
@@ -461,7 +432,7 @@ class DashboardHolder:
         return fig
 
     @staticmethod
-    def setup_navbar():
+    def _setup_navbar():
         """
         Set up the navigation bar for the web page with links to different
         sections, including links to different sections or pages. The
@@ -474,15 +445,16 @@ class DashboardHolder:
         """
         return dbc.Nav([
             dbc.NavLink("Accueil", href="/", active="exact"),
-            dbc.NavLink("Histogramme", href="/histogramme", active="exact"),
-            dbc.NavLink("Cartographie", href="/carte", active="exact"),
-            dbc.NavLink("Liens", href="/liens", active="exact"),
+            dbc.NavLink("Distribution", href="/distribution", active="exact"),
+            dbc.NavLink("Données Géolocalisées", href="/carte", active="exact"),
+            dbc.NavLink("Comparaisons rapides", href="/comparaisons",
+                        active="exact"),
         ],
             horizontal=True,
             pills=True,
         )
 
-    def setup_layout_home(self):
+    def _setup_layout_home(self):
         """
         Set up the home layout for the web page with fuel prices and
         distribution by city, including creating a header card with the title
@@ -498,46 +470,46 @@ class DashboardHolder:
             dbc.Card(
                 [
                     dbc.CardBody([
-                        self.set_title(
+                        self._set_title(
                             'Prix et répartition des carburants par ville en '
                             'France métropolitaine'),
 
-                        html.Div(self.set_date(self.last_update_date)),
+                        html.Div(self._set_date(self.last_update_date)),
                     ])
                 ],
                 className='header-box'
             ),
 
-            self.create_whitespace(5),
+            self._create_whitespace(5),
 
             html.Div([
                 dbc.Row([
-                    self.create_switch_button('switch-button'),
-                    self.create_dropdown('Sélectionnez la région :',
-                                         self.data_frame['Région'],
-                                         'reg'),
-                    self.create_dropdown('Sélectionnez le département :',
-                                         self.data_frame['Département'],
-                                         'dep'),
-                    self.create_dropdown('Sélectionnez la ville :',
-                                         self.data_frame['cp_ville'],
-                                         'cit')
+                    self._create_switch_button('switch-button'),
+                    self._create_dropdown('Sélectionnez la région :',
+                                          self.data_frame['Région'], 'reg'),
+                    self._create_dropdown('Sélectionnez le département :',
+                                          self.data_frame['Département'],
+                                          'dep'),
+                    self._create_dropdown('Sélectionnez la ville :',
+                                          self.data_frame['cp_ville'], 'cit')
                 ]),
 
-                self.create_whitespace(10),
+                self._create_whitespace(10),
 
                 dbc.Row([
-                    dbc.Col(self.generate_area_card('France'), md=3,
-                            className='area-card-home'
-                            ),
-                    dbc.Col(id='reg-card', md=3, className='area-card-home'),
-                    dbc.Col(id='dep-card', md=3, className='area-card-home'),
-                    dbc.Col(id='cit-card', md=3, className='area-card-home')
+                    html.Div(self._generate_area_card('France'),
+                             className='area-card-home'),
+                    html.Div(id='reg-card',
+                             className='area-card-home'),
+                    html.Div(id='dep-card',
+                             className='area-card-home'),
+                    html.Div(id='cit-card',
+                             className='area-card-home')
                 ]),
             ]),
         ]
 
-    def setup_layout_histogram(self):
+    def _setup_layout_distribution(self):
         """
         Set up the layout for the web page with histograms and pie charts,
         including creating a header card with the title and date, histograms
@@ -552,31 +524,31 @@ class DashboardHolder:
             dbc.Card(
                 [
                     dbc.CardBody([
-                        self.set_title(
+                        self._set_title(
                             'Distribution des stations essence en France'),
 
-                        html.Div(self.set_date(self.last_update_date)),
+                        html.Div(self._set_date(self.last_update_date)),
                     ])
                 ],
                 className='header-box'
             ),
 
-            self.create_whitespace(5),
+            self._create_whitespace(5),
 
             # Histogram
             dbc.Col([
-                self.create_dropdown('Sélectionnez le carburant :',
-                                     self.fuel_columns, 'fuel'),
-                self.create_graph_card(True, 'histogram-plot')
+                self._create_dropdown('Sélectionnez le carburant :',
+                                      self.fuel_columns, 'fuel'),
+                self._create_graph_card(True, 'histogram-plot')
             ]),
 
-            self.create_whitespace(10),
+            self._create_whitespace(10),
 
             dbc.Col([
                 # Regional Pie Chart
-                self.create_graph_card(
+                self._create_graph_card(
                     False,
-                    generate_static_graph=self.generate_pie_chart(
+                    generate_static_graph=self._generate_pie_chart(
                         self.data_frame,
                         'Région',
                         'Nombre de stations',
@@ -585,10 +557,12 @@ class DashboardHolder:
                     ),
                 ),
 
+                self._create_whitespace(10),
+
                 # Departmental Pie Chart
-                self.create_graph_card(
+                self._create_graph_card(
                     False,
-                    generate_static_graph=self.generate_pie_chart(
+                    generate_static_graph=self._generate_pie_chart(
                         self.data_frame.groupby('Région')['cp_ville']
                         .nunique()
                         .reset_index()
@@ -605,7 +579,7 @@ class DashboardHolder:
             ]),
         ]
 
-    def setup_layout_map(self):
+    def _setup_layout_map(self):
         """
         Set up the layout for the web page with a map displaying fuel station
         distribution and prices including creating a header card with the
@@ -620,22 +594,22 @@ class DashboardHolder:
             dbc.Card(
                 [
                     dbc.CardBody([
-                        self.set_title(
+                        self._set_title(
                             'Répartition des stations en France par ville'
                             ' et prix des carburants'),
 
-                        html.Div(self.set_date(self.last_update_date)),
+                        html.Div(self._set_date(self.last_update_date)),
                     ])
                 ],
                 className='header-box'
             ),
 
-            self.create_whitespace(5),
+            self._create_whitespace(5),
 
-            html.Div(self.generate_folium_map())
+            html.Div(self._generate_folium_map())
         ]
 
-    def setup_layout_link(self):
+    def _setup_layout_link(self):
         """
         Set up the layout for the web page with data relationships and
         dropdowns. Including creating a header card with the title and date,
@@ -650,30 +624,29 @@ class DashboardHolder:
             dbc.Card(
                 [
                     dbc.CardBody([
-                        self.set_title('Relation entre les données'),
-                        html.Div(self.set_date(self.last_update_date)),
+                        self._set_title('Relation entre les données'),
+                        html.Div(self._set_date(self.last_update_date)),
                     ])
                 ],
                 className='header-box'
             ),
 
-            self.create_whitespace(5),
+            self._create_whitespace(5),
 
             html.Div([
                 dbc.Row([
-                    dbc.Col(self.create_dropdown('Sélectionnez le carburant :',
-                                                 self.fuel_columns, 'fuel-1',
-                                                 'Gazole')),
-                    dbc.Col(self.create_dropdown('Sélectionnez le carburant :',
-                                                 self.fuel_columns,
-                                                 'fuel-2',
-                                                 value='SP98')),
-                    dbc.Col(self.create_dropdown('Sélectionnez le carburant :',
-                                                 self.fuel_columns, 'fuel-3',
-                                                 value='SP95')),
+                    dbc.Col(self._create_dropdown('Sélectionnez le carburant :',
+                                                  self.fuel_columns, 'fuel-1',
+                                                  'Gazole')),
+                    dbc.Col(self._create_dropdown('Sélectionnez le carburant :',
+                                                  self.fuel_columns, 'fuel-2',
+                                                  value='SP98')),
+                    dbc.Col(self._create_dropdown('Sélectionnez le carburant :',
+                                                  self.fuel_columns, 'fuel-3',
+                                                  value='SP95')),
                 ]),
 
-                self.create_whitespace(5),
+                self._create_whitespace(5),
 
                 dbc.Row([
                     dbc.Col(id='fuel-1-card', md=4, style={'padding': '10'}),
@@ -683,7 +656,7 @@ class DashboardHolder:
             ])
         ]
 
-    def setup_footer(self):
+    def _setup_footer(self):
         """
         Create a footer for the web page with copyright and attribution
         information.
@@ -701,31 +674,22 @@ class DashboardHolder:
                 ),
 
                 # Copyright
-                dbc.Col(
-                    html.Div(
-                        'Copyright © 2023 / 2024',
-                        className='copyright'
-                    ),
-                    md=3
+                html.Div(
+                    'Copyright © 2023 / 2024',
+                    className='copyright'
                 ),
 
                 # Credits
-                dbc.Col(
-                    html.Div(
-                        'CARANGEOT Hugo / SALI--ORLIANGE Lucas, encadrés par '
-                        'Monsieur COURIVAUD D.',
-                        className='credits'
-                    ),
-                    md=3
+                html.Div(
+                    'CARANGEOT Hugo / SALI--ORLIANGE Lucas, encadrés par '
+                    'Monsieur COURIVAUD D.',
+                    className='credits'
                 ),
 
                 # Unit
-                dbc.Col(
-                    html.Div(
-                        'DSIA-4101A : Python pour la Data Science',
-                        className='unit'
-                    ),
-                    md=3
+                html.Div(
+                    'DSIA-4101A : Python pour la Data Science',
+                    className='unit'
                 ),
 
                 # Logo ESIEE Paris
@@ -736,7 +700,7 @@ class DashboardHolder:
             ], className='footer')
         ])
 
-    def get_data_from_area(self, area):
+    def _get_data_from_area(self, area):
         """
         Retrieves and returns a subset of the dataset, filtering it by a
         specific geographic area. The area can be defined by its name,
@@ -761,7 +725,7 @@ class DashboardHolder:
 
         return self.data_frame
 
-    def generate_average_barchart(self, area):
+    def _generate_average_barchart(self, area):
         """
         Generate a bar chart comparing the percentage of fuel availability
         in a specific area to the national average. It displays both the
@@ -775,8 +739,8 @@ class DashboardHolder:
             plotly.graph_objs._figure.Figure: A Plotly figure representing the
             bar chart.
         """
-        data = self.get_data_from_area(area)
-        national_data = self.get_data_from_area('France')
+        data = self._get_data_from_area(area)
+        national_data = self._get_data_from_area('France')
 
         national_percentage = [
             (fuel,
@@ -869,7 +833,7 @@ class DashboardHolder:
 
         return fig
 
-    def display_fuel_info(self, fuel):
+    def _display_fuel_info(self, fuel):
         """
         Generate information about fuel prices in regions and departments.
         Creates a list of HTML elements that provide information about fuel
@@ -889,17 +853,19 @@ class DashboardHolder:
         text_fuel_list = []
 
         for area in list_area:
-            avg_fuel_price = self.data_frame.groupby(area)[fuel].mean(
-            ).reset_index()
-            top_5 = avg_fuel_price.nlargest(5, fuel).sort_values(by=fuel,
-                                                                 ascending=False)
-            min_5 = avg_fuel_price.nsmallest(5, fuel).sort_values(by=fuel,
-                                                                  ascending=True)
+            avg_fuel_price = (self.data_frame
+                              .groupby(area)[fuel]
+                              .mean()
+                              .reset_index())
+            top_5 = (avg_fuel_price.nlargest(5, fuel)
+                     .sort_values(by=fuel, ascending=False))
+            min_5 = (avg_fuel_price.nsmallest(5, fuel)
+                     .sort_values(by=fuel, ascending=True))
 
             text_fuel_list.extend([
                 html.H5(
                     f'5 {area}s les plus chères' if area == 'Région'
-                    else f'5 {area}s les plus chèrs',
+                    else f'5 {area}s les plus chers',
                     className='card-body-title'
                 ),
 
@@ -920,7 +886,7 @@ class DashboardHolder:
 
                 html.H5(
                     f'5 {area}s les moins chères' if area == 'Région'
-                    else f'5 {area}s les moins chèrs',
+                    else f'5 {area}s les moins chers',
                     className='card-body-title'),
 
                 html.Ol([
@@ -944,7 +910,7 @@ class DashboardHolder:
 
         return html.Ul(text_fuel_list)
 
-    def display_text_info(self, area):
+    def _display_text_info(self, area):
         """
         Generate a list of HTML elements containing information about a
         specific geographic area. It provides information about a specified
@@ -959,11 +925,11 @@ class DashboardHolder:
             dash.html.Ul: An HTML <ul> element containing the information about
             the area.
         """
-        area_data = self.get_data_from_area(area)
+        area_data = self._get_data_from_area(area)
         avg_area_price = area_data[self.fuel_columns].mean()
         area_stations_count = area_data['Nombre de stations'].sum()
 
-        national_data = self.get_data_from_area('France')
+        national_data = self._get_data_from_area('France')
         avg_prices_national = national_data[self.fuel_columns].mean()
         national_cs_count = self.data_frame['cp_ville'].nunique()
         national_stations_count = national_data['Nombre de stations'].sum()
@@ -1058,7 +1024,7 @@ class DashboardHolder:
         return html.Ul(text_info_list)
 
     @staticmethod
-    def set_title(title_text):
+    def _set_title(title_text):
         """
         Create an H1 element to display the main title.
 
@@ -1073,7 +1039,7 @@ class DashboardHolder:
                        )
 
     @staticmethod
-    def set_date(update_date):
+    def _set_date(update_date):
         """
         Create a Div element to display the last data update date.
 
@@ -1088,7 +1054,7 @@ class DashboardHolder:
                         )
 
     @staticmethod
-    def create_dropdown(ptext, plist, id_dropdown, value=None):
+    def _create_dropdown(ptext, plist, id_dropdown, value=None):
         """
         This function generates a Dash Dropdown component for selecting options
          from a list.
@@ -1136,11 +1102,10 @@ class DashboardHolder:
                     value=plist.unique()[0],
                     clearable=False
                 ),
-            ],
-                md=3
-            )
+            ], md=3
+        )
 
-    def generate_fuel_card(self, fuel):
+    def _generate_fuel_card(self, fuel):
         """
         Generate a card component displaying information for a specific
         fuel, including a title, data.
@@ -1163,7 +1128,7 @@ class DashboardHolder:
                 ),
 
                 dbc.CardBody([
-                    self.display_fuel_info(fuel)
+                    self._display_fuel_info(fuel)
                 ],
                     className='card-body-fuel'
                 )
@@ -1171,7 +1136,7 @@ class DashboardHolder:
             className='card-style',
         )
 
-    def generate_area_card(self, area):
+    def _generate_area_card(self, area):
         """
         Generate a card component displaying information for a specific
         geographic area, including a title, data, and a Plotly graph.
@@ -1206,7 +1171,7 @@ class DashboardHolder:
                                      className='card-body-title')
                              ),
 
-                    html.Div(self.display_text_info(area)),
+                    html.Div(self._display_text_info(area)),
 
                     html.Hr(),
 
@@ -1215,7 +1180,7 @@ class DashboardHolder:
                              ),
 
                     dcc.Graph(
-                        figure=self.generate_average_barchart(area),
+                        figure=self._generate_average_barchart(area),
                         config={'displayModeBar': False}
                     )
                 ])
@@ -1224,8 +1189,8 @@ class DashboardHolder:
         )
 
     @staticmethod
-    def create_graph_card(callback, graph_id=None,
-                          generate_static_graph=None):
+    def _create_graph_card(callback, graph_id=None,
+                           generate_static_graph=None):
         """
         Create a card containing a Plotly graph component.
 
@@ -1252,7 +1217,7 @@ class DashboardHolder:
         )
 
     @staticmethod
-    def create_whitespace(space):
+    def _create_whitespace(space):
         """
         Create a whitespace element with a specified margin-bottom in pixels.
 
@@ -1266,7 +1231,7 @@ class DashboardHolder:
         """
         return html.Div(style={'margin-bottom': f'{space}px'})
 
-    def from_reg_get_dep(self, reg):
+    def _from_reg_get_dep(self, reg):
         """
         Retrieve a list of unique departments in a specified French region.
 
@@ -1281,7 +1246,7 @@ class DashboardHolder:
         departments = filtered_data['Département'].unique().tolist()
         return departments
 
-    def from_dep_get_cities(self, dep):
+    def _from_dep_get_cities(self, dep):
         """
         Retrieve a list of unique cities in a specified French department.
 
@@ -1296,7 +1261,7 @@ class DashboardHolder:
         return cities
 
     @staticmethod
-    def create_switch_button(button_switch):
+    def _create_switch_button(button_switch):
         """
         Creates a switch button inside a card using Dash Bootstrap Components.
 
@@ -1320,12 +1285,3 @@ class DashboardHolder:
                 className='radio-items',
             ), md=3
         )
-
-
-if __name__ == '__main__':
-    price_columns_list = ['Gazole', 'SP98', 'SP95',
-                          'E85', 'E10', 'GPLc']
-    DATE = 'date test'
-    df = pd.read_csv('processed_data.csv')
-    dashboard = DashboardHolder(df, price_columns_list, DATE)
-    dashboard.app.run_server(debug=True)
