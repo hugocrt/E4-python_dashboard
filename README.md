@@ -1,25 +1,23 @@
+## <span style="color:red">THIS README IS IN FRENCH, PLEASE USE TRANSLATER IF NEEDED</span>
+
 # Tables des matières
 
-<span style="color:red">THIS README IS IN FRENCH, PLEASE USE TRANSLATER IF 
-NEEDED</span>
-
 ## Guide de l’utilisateur
-1. [De Git au répertoire local](#de-git-au-répertoire-local)
-2. [Lancer le programme python et accéder au Dashboard](#lancer-le-programme-python-et-accéder-au-dashboard)
-3. [Utiliser le Dashboard](#utiliser-le-dashboard)
+1. [De Git au répertoire local](#1---de-git-au-répertoire-local)
+2. [Lancer le programme python et accéder au Dashboard](#2---lancer-le-programme-python-et-accéder-au-dashboard)
+3. [Utiliser le Dashboard](#3---utiliser-le-dashboard)
 
 ## Rapport d’analyse
-1. [Rappels](#rappels)
-2. [Analyse des données de stations service en France](#analyse-des-données-de-stations-service-en-france)
+1. [Rappels](#1---rappels)
+2. [Analyse des données de stations service en France](#2---analyse-des-données-de-stations-service-en-france)
 
 ## Guide du développeur
-1. [Contexte](#contexte)
-2. [Structure logique](#structure-logique)
-3. [Continuer le développement](#continuer-le-développement)
+1. [Contexte](#1---contexte)
+2. [Structure logique](#2---structure-logique)
+3. [Continuer le développement](#3---continuer-le-développement)
 
 # GUIDE DE L’UTILISATEUR
 
-<a id="de-git-au-répertoire-local"></a>
 ## 1 - De Git au répertoire local
 
 Dans cette partie, nous allons nous intéresser sur comment récupérer le projet 
@@ -88,7 +86,7 @@ S’il n’y a aucun problème, ouvrez http://127.0.0.1:8050/ dans un navigateur
 (firefox, chrome…) sans fermer votre ‘Invite de Commandes’ (le main.py a besoin 
 de tourner pour mettre à jour les données sur votre dashboard).
 
-## 2 - Utiliser le Dashboard
+## 3 - Utiliser le Dashboard
 
 Lorsque vous ouvrez cet url, vous devriez obtenir ceci :
 
@@ -234,7 +232,7 @@ sont les prix pour cette zone géographique.
 
 ## 2 - STRUCTURE LOGIQUE
 
-Voici la structure complète du projet:
+Voici la structure complète du projet :
 
 ![folder tree](images/image_11.png)
 
