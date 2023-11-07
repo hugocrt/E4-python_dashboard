@@ -322,6 +322,7 @@ choses.
 
 Voici rapidement quelques idées d’ajouts, ou axes d’améliorations :
 
+- Doctests : rédiger les doctests (on ne l'a pas fait par manque de temps).
 - Carte : sélection d’une zone géographique, d’un carburant… 
 - Dashboard : scinder l'app en plusieurs fichiers : une page = un fichier, 
 avec ses propres callbacks…
