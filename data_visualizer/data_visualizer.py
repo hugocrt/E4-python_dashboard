@@ -358,16 +358,27 @@ class DashboardHolder:
             plotly.graph_objs._figure.Figure: A Plotly figure representing the
             generated price histogram.
         """
+
+        # Calculate the range of your data
+        min_value = self.data_frame[selected_fuel].min()
+        max_value = self.data_frame[selected_fuel].max()
+
+        # Define the desired bin width
+        bin_width = 1
+
+        # Calculate the number of bins
+        num_bins = int((max_value - min_value) / bin_width)
+
         histogram_fig = px.histogram(
             self.data_frame,
             x=selected_fuel,
             title=f"Histogramme des prix en France du {selected_fuel}",
-            labels={selected_fuel: f"Prix du {selected_fuel} en €"},
-            nbins=30,
+            labels={selected_fuel: f"Prix du {selected_fuel} en €"}
         )
 
         histogram_fig.update_traces(
-            marker={'line': {'width': 1, 'color': 'Blue'}}
+            marker={'line': {'width': 1, 'color': 'Blue'}},
+            xbins_size=0.05
         )
 
         return histogram_fig
@@ -640,10 +651,10 @@ class DashboardHolder:
                                                   'Gazole')),
                     dbc.Col(self._create_dropdown('Sélectionnez le carburant :',
                                                   self.fuel_columns, 'fuel-2',
-                                                  value='SP98')),
+                                                  first_value='SP98')),
                     dbc.Col(self._create_dropdown('Sélectionnez le carburant :',
                                                   self.fuel_columns, 'fuel-3',
-                                                  value='SP95')),
+                                                  first_value='SP95')),
                 ]),
 
                 self._create_whitespace(5),
@@ -1054,7 +1065,7 @@ class DashboardHolder:
                         )
 
     @staticmethod
-    def _create_dropdown(ptext, plist, id_dropdown, value=None):
+    def _create_dropdown(ptext, plist, id_dropdown, first_value=None):
         """
         This function generates a Dash Dropdown component for selecting options
          from a list.
@@ -1067,7 +1078,7 @@ class DashboardHolder:
 
             id_dropdown (str): The ID to assign to the dropdown.
 
-            value (str or None, optional): The default selected value for the
+            first_value (str or None, optional): The default selected value for the
             dropdown. If None, the first option is selected.
 
         Returns:
@@ -1076,21 +1087,11 @@ class DashboardHolder:
         """
         if not isinstance(plist, pd.Series):
             plist = pd.Series(plist)
-
-        if id_dropdown.split('-')[0] == 'fuel' and value is not None:
-            return dbc.Col(
-                [
-                    html.Label(ptext),
-                    dcc.Dropdown(
-                        id=f'{id_dropdown}-dropdown',
-                        options=[{'label': element, 'value': element}
-                                 for element in plist.unique()],
-                        value=value,
-                        clearable=False
-                    ),
-                ],
-                md=12
-            )
+        if first_value is None:
+            first_value = plist.unique()[0]
+        column = 3
+        if id_dropdown.split('-')[0] == 'fuel' and first_value is not None:
+            column = 12
 
         return dbc.Col(
             [
@@ -1099,10 +1100,10 @@ class DashboardHolder:
                     id=f'{id_dropdown}-dropdown',
                     options=[{'label': element, 'value': element}
                              for element in plist.unique()],
-                    value=plist.unique()[0],
+                    value=first_value,
                     clearable=False
                 ),
-            ], md=3
+            ], md=column
         )
 
     def _generate_fuel_card(self, fuel):

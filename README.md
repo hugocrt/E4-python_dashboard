@@ -177,11 +177,15 @@ départements à bas prix, il semble y avoir plus de variabilité.
 ![histogram bioethanol](images/image_8.png)
 
 - Le Gazole, le SP98, le SP95 et le GPL présentent une distribution semblable à 
-une loi normale. Cela se traduit par des variations de prix marquées, 
-indiquant une grande sensibilité à certains facteurs.
+  une loi normale (contenant que peu de données). Cela se traduit par des 
+  variations de prix marquées, indiquant une grande sensibilité à certains 
+  facteurs. De plus, nous voyons la très grande majorité des comptages 
+  excentrés sur la gauche, on comprend alors qu'il y a des grands extrêmes 
+  au niveau des prix (prix extrêmement chers).
 - Les E10 et E85 quant à eux présentent une distribution avec une 
   concentration de prix autour d'une valeur médiane, indiquant une relative 
-  stabilité des prix sur le territoire national.
+  stabilité des prix sur le territoire national. Les comptages sont beaucoup 
+  plus centrés, montrant néanmoins des prix extrêmes des deux côtés.
 - Les carburants sans plomb (SP98 et SP95) montrent des prix relativement 
   proches, avec un léger supplément pour le SP98.
 
