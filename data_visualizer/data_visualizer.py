@@ -263,12 +263,10 @@ class DashboardHolder:
 
     def _generate_folium_map(self):
         """
-        Generate a Folium map displaying markers for cities, where each marker
-        represents a city's geographical location. The map is centered on France
-        , and the markers are added based on city data from the DataFrame.
+        Generate a Folium map with a MarkerCluster for city markers.
 
         Returns:
-            dash.html.Iframe: An HTML iframe element containing the Folium map.
+            html.Iframe: An HTML iframe containing the rendered Folium map.
         """
         france_center = [46.232193, 2.209667]
         map1 = folium.Map(
@@ -283,66 +281,58 @@ class DashboardHolder:
             max_lon=24,
             max_bounds=True
         )
-        markercluster = MarkerCluster()
-        self._add_cities_markers(markercluster)
-        map1.add_child(markercluster)
+
+        marker_cluster = MarkerCluster().add_to(map1)
+        markers = self._get_city_markers()
+
+        for marker in markers:
+            marker.add_to(marker_cluster)
+
         folium_map_html = map1.get_root().render()
         return html.Iframe(srcDoc=folium_map_html,
-                           className='folium-iframe-style'
-                           )
+                           className='folium-iframe-style')
 
-    def _get_city_popup(self, row):
+    def _get_city_markers(self):
         """
-        Generate the popup content for a city marker on a Folium map.
-        the popup appears when clicking on a city marker on a Folium map. The
-        popup displays information about the city, including fuel prices for
-        various fuel types and the number of stations.
-
-        Args:
-            row (pd.Series): A row from the DataFrame containing city data.
+        Get a list of Folium Markers for cities with popup information.
 
         Returns:
-            folium.Popup: A Popup object containing the city information.
+            list: List of Folium Markers.
+        """
+        locations = self.data_frame[['Latitude', 'Longitude']].values
+        popup_contents = self.data_frame.apply(self._get_city_popup_content,
+                                               axis=1).tolist()
+
+        markers = [
+            folium.Marker(
+                location=[lat, lon],
+                popup=folium.Popup(popup_content, max_width=300)
+            )
+            for (lat, lon), popup_content in zip(locations, popup_contents)
+        ]
+        return markers
+
+    def _get_city_popup_content(self, row):
+        """
+        Generate popup content for a city marker.
+
+        Args:
+            row (pd.Series): A row from the DataFrame containing city information.
+
+        Returns:
+            str: Popup content in HTML format.
         """
         popup_title = f"<h4>{row['cp_ville']}</h4>"
 
-        # Generate the fuel information for the popup
-        popup_fuel = ''
-        for col in self.fuel_columns:
-            fuel_value = row[col]
-            if pd.notna(fuel_value):
-                popup_fuel += f"<b>{col}:</b> {fuel_value:.3f}€/L<br>"
-            else:
-                popup_fuel += (f"<b>{col}:</b> <span "
-                               f"style='color:red;'>Non disponible</span>"
-                               f"<br>")
+        popup_fuel = [
+            f"<b>{col}:</b> {row[col]:.3f}€/L<br>" if pd.notna(row[col]) else
+            f"<b>{col}:</b> <span style='color:red;'>Non disponible</span><br>"
+            for col in self.fuel_columns
+        ]
 
-        popup_stations_count = (f"<br><b>Nombre de stations:</b>"
-                                f" {row['Nombre de stations']}")
+        popup_stations_count = f"<br><b>Nombre de stations:</b> {row['Nombre de stations']}"
 
-        return folium.Popup(popup_title + popup_fuel + popup_stations_count,
-                            max_width=300)
-
-    def _add_cities_markers(self, markerc: MarkerCluster):
-        """
-        Add city markers to a MarkerCLuster. For each city specified in a
-        DataFrame
-        . Each marker is placed at the geographical coordinates (latitude and
-        longitude) of the city and includes a popup with information about the
-        city.
-
-        Args:
-            markerc (folium.Map): The Folium map to which markers will be
-            added.
-
-        Returns:
-            None
-        """
-        for _, row in self.data_frame.iterrows():
-            folium.Marker(
-                location=[row['Latitude'], row['Longitude']],
-                popup=self._get_city_popup(row)
-            ).add_to(markerc)
+        return f"{popup_title}<br>{''.join(popup_fuel)}{popup_stations_count}"
 
     def _generate_price_histogram(self, selected_fuel='Gazole'):
         """
@@ -358,17 +348,6 @@ class DashboardHolder:
             plotly.graph_objs._figure.Figure: A Plotly figure representing the
             generated price histogram.
         """
-
-        # Calculate the range of your data
-        min_value = self.data_frame[selected_fuel].min()
-        max_value = self.data_frame[selected_fuel].max()
-
-        # Define the desired bin width
-        bin_width = 1
-
-        # Calculate the number of bins
-        num_bins = int((max_value - min_value) / bin_width)
-
         histogram_fig = px.histogram(
             self.data_frame,
             x=selected_fuel,

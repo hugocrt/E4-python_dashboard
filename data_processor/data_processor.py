@@ -84,6 +84,7 @@ class DataFrameHolder:
         Processes the data by performing data cleaning and computing a new
         DataFrame.
         """
+        print('wait for the data processing...')
         self._data_cleaning()
         self._compute_new_dataframe()
 
